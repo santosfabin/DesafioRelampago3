@@ -20,18 +20,14 @@ const login = async (req: Request, res: Response) => {
 
     const result = await loginServices.authenticateUser(email, password);
 
-    // if (typeof result !== "string") {
-    // 	return res.status(result.errorCode).json({error: result.errorMessage});
-    // }
-
     res.cookie('session_id', result.sessionToken, {
       httpOnly: true,
       maxAge: 864000000,
     });
 
     res.status(200).json({ id: result.user });
-  } catch (error) {
-    res.status(500).json({ error: 'Falha no servidor' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 };
 

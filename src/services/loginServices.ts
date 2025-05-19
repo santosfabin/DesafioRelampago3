@@ -7,16 +7,13 @@ const authenticateUser = async (email: string, password: string) => {
     const userData = await loginRepository.getUserData(email);
 
     if (!userData) {
-      return {
-        errorCode: 404,
-        errorMessage: 'E-mail não cadastrado',
-      };
+      throw new Error('E-mail não cadastrado');
     }
 
     const isPasswordValid = await comparePassword(password, userData.password);
 
     if (!isPasswordValid) {
-      return { errorCode: 404, errorMessage: 'Senha inválida' };
+      throw new Error('Senha inválida');
     }
 
     const user = userData.id;

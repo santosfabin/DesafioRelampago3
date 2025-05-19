@@ -34,13 +34,6 @@ const updateUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const token = req.cookies.session_id;
-    const decoded = jwt.verify(token, config.SECRET_KEY) as JwtPayload;
-
-    if (decoded.user !== Number(id)) {
-      return res.status(401).json({ error: 'Não autorizado' });
-    }
-
     const { name, email, password } = req.body;
 
     if (!name && !email && !password) {
@@ -75,13 +68,6 @@ const removeUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const token = req.cookies.session_id;
-    const decoded = jwt.verify(token, config.SECRET_KEY) as JwtPayload;
-
-    if (decoded.user !== Number(id)) {
-      return res.status(401).json({ error: 'Não autorizado' });
-    }
-
     const result = await userService.removeUser(id);
     if (result.error) {
       return res.status(400).json({ error: result });
@@ -114,4 +100,4 @@ const removeUser = async (req: Request, res: Response) => {
 
 // module.exports = { createUser, updateUser, removeUser, showAllUsers };
 
-module.exports = { createUser, updateUser, removeUser};
+module.exports = { createUser, updateUser, removeUser };

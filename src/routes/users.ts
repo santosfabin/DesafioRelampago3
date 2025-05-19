@@ -4,11 +4,15 @@ const router = express.Router();
 const userController = require("../controller/userController");
 
 import {verifyActiveSession} from "../middleware";
+import {authorizeUser} from "../middleware/authorizeUser";
 
 router.post("/", userController.createUser);
 
-router.put("/:id", verifyActiveSession, userController.updateUser);
-router.delete("/:id", verifyActiveSession, userController.removeUser);
+// Aplica o middleware de sessão ativa para todas as rotas abaixo
+router.use(verifyActiveSession);
+
+router.put("/:id", authorizeUser, userController.updateUser);
+router.delete("/:id", authorizeUser, userController.removeUser);
 // router.get("/", verifyActiveSession, userController.showAllUsers);
 
 
