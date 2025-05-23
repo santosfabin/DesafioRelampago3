@@ -7,9 +7,13 @@ const createUserSql = async (name: string, email: string, password: string) => {
       [name, email, password]
     );
     return result.rows;
-  } catch (e) {
-    console.error(e);
-    return null;
+  } catch (e: any) {
+    console.error('Console.erro', e);
+    if (e.code === '23505' && e.constraint === 'users_email_key') {
+      throw new Error('Erro ao criar usuário');
+    }
+
+    throw new Error(e.message);
   }
 };
 
@@ -21,7 +25,7 @@ const updateUserSql = async (id: number, updatedFields: any) => {
 
     if (userCheckResult.rowCount === 0) {
       console.error('Usuário não encontrado.');
-      return { error: 'Usuário não encontrado.' };
+      throw new Error(`Usuário não encontrado.`);
     }
 
     // Verificar se o email já existe (em outro usuário)
@@ -63,7 +67,7 @@ const updateUserSql = async (id: number, updatedFields: any) => {
     // Se nenhum campo foi enviado para atualizar, retornamos um erro
     if (!setClause) {
       console.error('Nenhum campo para atualizar.');
-      return { error: 'Nenhum campo para atualizar.' };
+      throw new Error(`Nenhum campo para atualizar.`);
     }
 
     // Remover a vírgula extra no final da parte SET
@@ -79,7 +83,7 @@ const updateUserSql = async (id: number, updatedFields: any) => {
     // Verificando o resultado da query
     if (result.rowCount === 0) {
       console.error('Erro ao atualizar usuário.');
-      return { error: 'Erro ao atualizar usuário.' };
+      throw new Error(`Erro ao atualizar usuário.`);
     }
 
     return result.rows;
@@ -92,9 +96,10 @@ const removeUserSql = async (id: number) => {
   try {
     const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING *', [id]);
     return result.rows;
-  } catch (e) {
-    console.error(e);
-    return null;
+  } catch (e: any) {
+    console.error('Console.erro', e);
+
+    throw new Error(e.message);
   }
 };
 

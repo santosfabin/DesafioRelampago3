@@ -15,42 +15,36 @@ const createUser = async (
   errorMessage?: string;
 }> => {
   if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
-    return { error: 'Todos os campos devem ser texto.' };
+    throw new Error(`Todos os campos devem ser texto.`);
   }
 
   const cleanName = name.replace(/\s/g, '');
   if (!/^[\p{L}0-9\s\-_]+$/u.test(name) || cleanName.length < 4) {
-    return {
-      error: 'Nome inválido. Use apenas letras, espaços e números, com pelo menos 4 letras.',
-    };
+    throw new Error(
+      `Nome inválido. Use apenas letras, espaços e números, com pelo menos 4 letras.`
+    );
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { error: 'Email inválido.' };
+    throw new Error(`Email inválido.`);
   }
 
   if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/.test(password)) {
-    return {
-      error: 'Senha inválida. Deve conter pelo menos uma letra, um número e 8 caracteres.',
-    };
+    throw new Error(`Senha inválida. Deve conter pelo menos uma letra, um número e 8 caracteres.`);
   }
 
   const hashedPassword = await hashPassword(password);
 
   if (!hashedPassword) {
-    return {
-      errorCode: 500,
-      errorMessage: 'Falha na geração do hash da senha',
-    };
+    throw new Error(`Falha na geração do hash da senha.`);
   }
 
   const user = await userRepository.createUserSql(name, email, hashedPassword);
   if (!user) {
-    return { error: 'Erro ao criar o usuário no banco de dados.' };
+    throw new Error(`Erro ao criar o usuário no banco de dados.`);
   }
 
   const userWithoutPassword: IUser = {
-    id: user[0].id,
     name: user[0].name,
     email: user[0].email,
   };
@@ -74,7 +68,9 @@ const updateUser = async (id: number, updatedFields: any) => {
       name &&
       (typeof name !== 'string' || name.length < 4 || !/^[\p{L}0-9\s\-_]+$/u.test(name))
     ) {
-      throw new Error('Nome inválido. Use apenas letras, espaços e números, com pelo menos 4 letras.');
+      throw new Error(
+        'Nome inválido. Use apenas letras, espaços e números, com pelo menos 4 letras.'
+      );
     }
 
     // Validações para o campo email
@@ -110,13 +106,12 @@ const updateUser = async (id: number, updatedFields: any) => {
     // Chama o repositório para atualizar o usuário no banco de dados
     const result = await userRepository.updateUserSql(id, fieldsToUpdate);
     if ('error' in result) {
-      return { error: result.error };
+      throw new Error(result.message);
     }
 
     const updatedUser = result[0];
 
     const userWithoutPassword: IUser = {
-      id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
     };
@@ -136,10 +131,10 @@ const removeUser = async (id: number) => {
   try {
     const result = await userRepository.removeUserSql(id);
     if ('error' in result) {
-      return { error: result.error };
+      throw new Error(result.message);
     }
 
-    return { id: result[0].id };
+    return { message: `User removed` };
   } catch (error: unknown) {
     if (error instanceof Error) {
       // Agora TypeScript sabe que 'error' é do tipo 'Error'
@@ -175,4 +170,4 @@ const removeUser = async (id: number) => {
 // };
 
 // module.exports = { createUser, updateUser, removeUser, showAllUsers };
-module.exports = { createUser, updateUser, removeUser};
+module.exports = { createUser, updateUser, removeUser };

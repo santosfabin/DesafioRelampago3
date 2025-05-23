@@ -1,7 +1,5 @@
 import { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
-import { JwtPayload } from 'jsonwebtoken';
-import config from '../config';
+import { getUserIdFromToken } from '../utils/getUserIdFromToken';
 const userService = require('../services/userService');
 
 const createUser = async (req: Request, res: Response) => {
@@ -32,7 +30,11 @@ const createUser = async (req: Request, res: Response) => {
 
 const updateUser = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const token = req.cookies.session_id;
+    if (!token) return res.status(401).json({ error: 'Token não fornecido' });
+
+    const id = getUserIdFromToken(token);
+    if (!id) return res.status(401).json({ error: 'Token inválido' });
 
     const { name, email, password } = req.body;
 
@@ -58,7 +60,7 @@ const updateUser = async (req: Request, res: Response) => {
 
     return res.status(200).json(result.user);
   } catch (error: any) {
-    console.error(error);
+    console.error("Console.erro", error);
 
     return res.status(500).json({ error: 'Erro ao atualizar usuário.', message: error.message });
   }
@@ -66,7 +68,11 @@ const updateUser = async (req: Request, res: Response) => {
 
 const removeUser = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const token = req.cookies.session_id;
+    if (!token) return res.status(401).json({ error: 'Token não fornecido' });
+
+    const id = getUserIdFromToken(token);
+    if (!id) return res.status(401).json({ error: 'Token inválido' });
 
     const result = await userService.removeUser(id);
     if (result.error) {
@@ -77,7 +83,7 @@ const removeUser = async (req: Request, res: Response) => {
 
     return res.status(200).json(result);
   } catch (error) {
-    console.error(error);
+    console.error("Console.erro", error);
 
     return res.status(500).json({ error: 'Erro ao remover usuário.' });
   }
