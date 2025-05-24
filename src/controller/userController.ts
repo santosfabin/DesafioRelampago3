@@ -24,7 +24,7 @@ const createUser = async (req: Request, res: Response) => {
 
     return res.status(200).json(result.user);
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return res.status(400).json({ error: e.message });
   }
 };
 
@@ -62,7 +62,7 @@ const updateUser = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Console.erro", error);
 
-    return res.status(500).json({ error: 'Erro ao atualizar usuário.', message: error.message });
+    return res.status(400).json({ error: 'Erro ao atualizar usuário.', message: error.message });
   }
 };
 
@@ -85,7 +85,7 @@ const removeUser = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Console.erro", error);
 
-    return res.status(500).json({ error: 'Erro ao remover usuário.' });
+    return res.status(400).json({ error: 'Erro ao remover usuário.' });
   }
 };
 
@@ -100,7 +100,7 @@ const removeUser = async (req: Request, res: Response) => {
 //   } catch (error) {
 //     console.error(error);
 
-//     return res.status(500).json({ error: 'Erro ao buscar usuários.' });
+//     return res.status(400).json({ error: 'Erro ao buscar usuários.' });
 //   }
 // };
 

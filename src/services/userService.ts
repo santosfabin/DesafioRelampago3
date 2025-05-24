@@ -105,6 +105,7 @@ const updateUser = async (id: number, updatedFields: any) => {
 
     // Chama o repositório para atualizar o usuário no banco de dados
     const result = await userRepository.updateUserSql(id, fieldsToUpdate);
+    
     if ('error' in result) {
       throw new Error(result.message);
     }
@@ -119,7 +120,6 @@ const updateUser = async (id: number, updatedFields: any) => {
     return { user: userWithoutPassword };
   } catch (error: unknown) {
     if (error instanceof Error) {
-      // Agora TypeScript sabe que 'error' é do tipo 'Error'
       throw new Error(error.message);
     } else {
       throw new Error('Erro desconhecido ao atualizar usuário.');
@@ -137,7 +137,6 @@ const removeUser = async (id: number) => {
     return { message: `User removed` };
   } catch (error: unknown) {
     if (error instanceof Error) {
-      // Agora TypeScript sabe que 'error' é do tipo 'Error'
       throw new Error(error.message || 'Erro ao remover usuário.');
     } else {
       throw new Error('Erro desconhecido ao remover usuário.');
@@ -152,7 +151,7 @@ const removeUser = async (id: number) => {
 //       return { error: result.error };
 //     }
 
-//     // Remove a senha de cada usuário
+//     // Retira a senha de cada usuário, ou seja, não vai enviar
 //     const usersWithoutPassword = result.map((user: any) => ({
 //       id: user.id,
 //       name: user.name,
