@@ -105,12 +105,12 @@ const updateUser = async (id: number, updatedFields: any) => {
 
     // Chama o repositório para atualizar o usuário no banco de dados
     const result = await userRepository.updateUserSql(id, fieldsToUpdate);
-    
+
     if ('error' in result) {
       throw new Error(result.message);
     }
 
-    const updatedUser = result[0];
+    const updatedUser = result;
 
     const userWithoutPassword: IUser = {
       name: updatedUser.name,

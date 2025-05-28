@@ -1,14 +1,18 @@
 const assetRepository = require('../repository/assetRepository');
 
-const showAllAssets = async (id: number) => {
+const showOneAssets = async (id: number, item: string) => {
   try {
-    const result = await assetRepository.showAllAssetsSql(id);
+    const result = await assetRepository.showOneAssetsSql(id, item);
 
     if ('error' in result) {
       throw new Error(result.message);
     }
 
-    return { assets: result };
+    if (result.length > 0) {
+      return { asset: result };
+    } else {
+      throw new Error('Maintenance not found');
+    }
   } catch (error: unknown) {
     if (error instanceof Error) {
       throw new Error(error.message || 'Erro ao buscar usuários.');
@@ -18,15 +22,19 @@ const showAllAssets = async (id: number) => {
   }
 };
 
-const showOneAssets = async (id: number, item: string) => {
+const showAllAssets = async (id: number) => {
   try {
-    const result = await assetRepository.showOneAssetsSql(id, item);
+    const result = await assetRepository.showAllAssetsSql(id);
 
     if ('error' in result) {
       throw new Error(result.message);
     }
 
-    return { asset: result };
+    if (result.length > 0) {
+      return { asset: result };
+    } else {
+      throw new Error('Maintenance not found');
+    }
   } catch (error: unknown) {
     if (error instanceof Error) {
       throw new Error(error.message || 'Erro ao buscar usuários.');

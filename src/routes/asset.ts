@@ -1,9 +1,13 @@
-const express = require('express');
+import express from 'express';
+
 const router = express.Router();
 
 const assetController = require('../controller/assetController');
+const maintenanceRouter = require('./maintenanceRouter');
 
-router.get('/:id', assetController.showOneAssets);
+router.use('/:id/maintenances', maintenanceRouter);
+
+router.get('/:id', assetController.showOneAsset);
 router.get('/', assetController.showAllAssets);
 router.post('/', assetController.createAsset);
 router.put('/:id', assetController.updateAsset);

@@ -72,8 +72,6 @@ const updateAssetSql = async (
       RETURNING *
     `;
 
-    console.log(values)
-
     const result = await pool.query(query, values);
 
     return result.rows[0];

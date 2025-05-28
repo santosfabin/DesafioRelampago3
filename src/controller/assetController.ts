@@ -23,7 +23,7 @@ const showAllAssets = async (req: Request, res: Response) => {
   }
 };
 
-const showOneAssets = async (req: Request, res: Response) => {
+const showOneAsset = async (req: Request, res: Response) => {
   try {
     const token = req.cookies.session_id;
     if (!token) return res.status(401).json({ error: 'Token não fornecido' });
@@ -146,4 +146,4 @@ const removeAsset = async (req: Request, res: Response) => {
   }
 };
 
-module.exports = { showAllAssets, showOneAssets, createAsset, updateAsset, removeAsset };
+module.exports = { showAllAssets, showOneAsset, createAsset, updateAsset, removeAsset };
