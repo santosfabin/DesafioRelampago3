@@ -16,6 +16,7 @@ import AssetList from './components/AssetList';
 import AssetForm from './components/AssetForm';
 import MaintenanceList from './components/MaintenanceList';
 import MaintenanceForm from './components/MaintenanceForm';
+import UserProfile from './components/UserProfile';
 
 const darkTheme = createTheme({
   palette: {
@@ -102,6 +103,7 @@ function App() {
                 <Route path="/assets/:id" element={<AssetForm />} />
                 <Route path="/assets/:assetId/maintenances" element={<MaintenanceList />} />
                 <Route path="/assets/:assetId/maintenances/new" element={<MaintenanceForm />} />
+                <Route path="/profile" element={<UserProfile />} />
                 <Route
                   path="/assets/:assetId/maintenances/:maintenanceId"
                   element={<MaintenanceForm />}

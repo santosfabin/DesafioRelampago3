@@ -1,4 +1,3 @@
-// frontend/src/components/MaintenanceForm.tsx
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select'; // Usando import de tipo
@@ -105,15 +104,9 @@ const MaintenanceForm = () => {
             throw new Error(errorMsg);
           }
           const responseData = await response.json();
-          // ==========================================================================================
-          // PONTO DE DEBUG: DESCOMENTE A LINHA ABAIXO PARA VER A ESTRUTURA DA RESPOSTA DA API
-          // console.log('MaintenanceForm (fetchMaintenance) - Dados JSON crus da API:', responseData);
-          // ==========================================================================================
 
           let maintDetails: Maintenance | undefined;
 
-          // AJUSTE A LÓGICA DE EXTRAÇÃO ABAIXO CONFORME A ESTRUTURA DA SUA API
-          // Exemplo 1: se a API retornar { maintenance: { ...dados da manutenção... } } (objeto direto)
           if (
             responseData &&
             responseData.maintenance &&

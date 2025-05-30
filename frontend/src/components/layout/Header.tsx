@@ -1,37 +1,31 @@
 // frontend/src/components/layout/Header.tsx
-import type { Dispatch, SetStateAction } from 'react'; // ADICIONAR Dispatch e SetStateAction
+import type { Dispatch, SetStateAction } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import { Link as RouterLink, useNavigate } from 'react-router'; // Ou 'react-router'
+import { Link as RouterLink, useNavigate } from 'react-router'; // USANDO 'react-router'
 import Box from '@mui/material/Box';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle'; // Ícone opcional para o perfil
+import IconButton from '@mui/material/IconButton'; // Se quiser usar um ícone como botão
+import Tooltip from '@mui/material/Tooltip'; // Para o tooltip do ícone
 
-// 1. DEFINIR A INTERFACE DE PROPS
 interface HeaderProps {
   isAuthenticated: boolean;
   setIsAuthenticated: Dispatch<SetStateAction<boolean>>;
 }
 
-// 2. RECEBER AS PROPS
 const Header = ({ isAuthenticated, setIsAuthenticated }: HeaderProps) => {
   const navigate = useNavigate();
 
-  // const isAuthenticated = !!localStorage.getItem('token'); // REMOVIDO - Agora vem via prop
-
   const handleLogout = async () => {
     try {
-      // 3. CHAMAR API DE LOGOUT DO BACKEND
       await fetch('/api/logout', { method: 'DELETE' });
     } catch (error) {
       console.error('Failed to logout from server:', error);
-      // Mesmo se a chamada ao servidor falhar, prosseguimos com o logout no cliente.
     } finally {
-      // 4. ATUALIZAR ESTADO DE AUTENTICAÇÃO
       setIsAuthenticated(false);
-      // 5. NAVEGAR PARA LOGIN
       navigate('/login');
-      // localStorage.removeItem('token'); // REMOVIDO - Não usamos token no localStorage para sessão
     }
   };
 
@@ -41,21 +35,37 @@ const Header = ({ isAuthenticated, setIsAuthenticated }: HeaderProps) => {
         <Typography
           variant="h6"
           component={RouterLink}
-          to={isAuthenticated ? '/' : '/login'} // Leva para home se logado, login se não
+          to={isAuthenticated ? '/' : '/login'}
           sx={{ flexGrow: 1, textDecoration: 'none', color: 'inherit' }}
         >
           AssetManager
         </Typography>
-        {/* 6. USAR A PROP isAuthenticated PARA RENDERIZAÇÃO CONDICIONAL */}
         {isAuthenticated ? (
-          <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {' '}
+            {/* alignItems para alinhar ícone e botões */}
             <Button color="inherit" component={RouterLink} to="/assets">
               Assets
             </Button>
-            {/* Adicione outros botões de navegação para usuários logados aqui */}
+            {/* Ou, se preferir um botão de texto:
+            <Button color="inherit" component={RouterLink} to="/profile">
+              My Account
+            </Button>
+            */}
             <Button color="inherit" onClick={handleLogout}>
               Logout
             </Button>
+            {/* === NOVO BOTÃO/LINK PARA O PERFIL === */}
+            <Tooltip title="My Account">
+              <IconButton
+                color="inherit"
+                component={RouterLink}
+                to="/profile" // Navega para a rota do perfil
+                aria-label="account of current user"
+              >
+                <AccountCircleIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
         ) : (
           <Box>
