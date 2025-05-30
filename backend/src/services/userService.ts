@@ -29,9 +29,9 @@ const createUser = async (
     throw new Error(`Email inválido.`);
   }
 
-  if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/.test(password)) {
-    throw new Error(`Senha inválida. Deve conter pelo menos uma letra, um número e 8 caracteres.`);
-  }
+ if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password)) { // .{8,} permite qualquer caractere
+  throw new Error('Senha inválida. Deve conter pelo menos uma letra, um número e no mínimo 8 caracteres.');
+}
 
   const hashedPassword = await hashPassword(password);
 
