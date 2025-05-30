@@ -18,7 +18,7 @@ const showOneMaintenance = async (userId: number, assetId: string, maintenanceId
     if (result.length > 0) {
       return { maintenance: result };
     } else {
-      throw new Error('Maintenance not found');
+      return { maintenance: [] };
     }
   } catch (error: unknown) {
     if (error instanceof Error) {
@@ -40,7 +40,7 @@ const showAllMaintenance = async (userId: number, assetId: string) => {
     if (result.length > 0) {
       return { maintenance: result };
     } else {
-      throw new Error('Maintenance not found');
+      return { maintenance: [] };
     }
   } catch (error: unknown) {
     if (error instanceof Error) {

@@ -143,13 +143,9 @@ const updateMaintenanceSql = async (
         if (updateData[f] === undefined) {
           // Se campo não veio no update, mantém o valor antigo (existente)
           dataToUpdate[f] = existing[f] ?? null;
-        } else {
-          // Se veio, mantém o valor enviado (já mesclado)
-          // dataToUpdate[f] já está certo
         }
       }
     }
-    // Se não enviou nem data nem uso, mantém o que veio (já mesclado)
 
     // 6. Remove chaves undefined (não atualiza campos não passados)
     for (const k in dataToUpdate) {

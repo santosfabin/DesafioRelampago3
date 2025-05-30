@@ -11,7 +11,7 @@ const showOneAssets = async (id: number, item: string) => {
     if (result.length > 0) {
       return { asset: result };
     } else {
-      throw new Error('Maintenance not found');
+      return { asset: [] };
     }
   } catch (error: unknown) {
     if (error instanceof Error) {
@@ -33,7 +33,7 @@ const showAllAssets = async (id: number) => {
     if (result.length > 0) {
       return { asset: result };
     } else {
-      throw new Error('Maintenance not found');
+      return { asset: [] };
     }
   } catch (error: unknown) {
     if (error instanceof Error) {
