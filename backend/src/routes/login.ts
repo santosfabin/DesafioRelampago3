@@ -12,8 +12,8 @@ const loginController = require('../controller/loginController');
 
 router.post('/', loginController.login);
 
-router.get('/checkLogin', verifyActiveSession, (req: AuthRequest, res) => {
-  res.json({ loggedIn: true, user: req.user });
+router.get('/checkLogin', verifyActiveSession, (req, res) => {
+  res.json({ loggedIn: true, user: (req as AuthRequest).user });
 });
 
 module.exports = router;

@@ -1,5 +1,97 @@
 # Assistente de Manutenção de Ativos
 
+## Como Executar o Projeto (Desenvolvimento)
+
+Para rodar este projeto em ambiente de desenvolvimento e testar a API com o Postman, siga os passos abaixo:
+
+**Pré-requisitos Essenciais:**
+
+- **Node.js e npm/yarn:** Conforme especificado na seção "Pré-requisitos (Backend)" mais abaixo.
+- **PostgreSQL:** Instalado, rodando e acessível.
+- **Postman (ou similar):** Ferramenta essencial para interagir e testar os endpoints da API backend.
+
+**Passos de Configuração e Execução:**
+
+1.  **Clonar o Repositório (se ainda não o fez):**
+
+    ```bash
+    git clone <URL_DO_SEU_REPOSITORIO>
+    cd <NOME_DA_PASTA_DO_PROJETO>
+    ```
+
+2.  **Instalar Dependências (Backend e Frontend):**
+    É crucial instalar as dependências em ambas as pastas do projeto. Execute os seguintes comandos:
+
+    ```bash
+    # Na pasta backend
+    cd backend
+    npm install
+    # ou yarn install
+    ```
+
+    ```bash
+    # Na pasta frontend (a partir da raiz do projeto)
+    cd ../frontend
+    npm install
+    # ou yarn install
+    ```
+
+3.  **Configurar o Backend e Banco de Dados:**
+    a. Volte para a pasta do backend:
+    `bash
+    cd ../backend # Se você estava na pasta frontend
+    `
+    b. **Variáveis de Ambiente (`.env`):**
+    Crie um arquivo `.env` na raiz da pasta `backend/`. Você pode se basear em um arquivo `backend/.env.example` (se fornecido). Este arquivo é crucial para a conexão com o banco de dados e para a segurança da sessão, que o Postman utilizará indiretamente ao testar endpoints autenticados.
+    Exemplo de conteúdo para `backend/.env`:
+    `env
+    PORT=3001
+    DB_USER=seu_usuario_postgres
+    DB_HOST=localhost
+    DB_NAME=asset_maintenance_db
+    DB_PASSWORD=sua_senha_postgres
+    DB_PORT=5432
+    SESSION_SECRET=coloque_aqui_uma_chave_secreta_bem_forte_e_longa # Importante para segurança da sessão
+    ` \* **Acesso para o Postman:** O Postman interagirá com a API na URL baseada na `PORT` (ex: `http://localhost:3001`). A `SESSION_SECRET` é usada pelo backend para assinar os cookies de sessão. O Postman armazenará e enviará esses cookies automaticamente após o login, permitindo testar rotas protegidas. Não há uma configuração "direta" para o Postman no `.env`, mas garantir que o `SESSION_SECRET` esteja configurado é vital para que a autenticação (testada via Postman) funcione.
+
+    c. **Configuração do Banco de Dados PostgreSQL:** - Certifique-se de que o usuário (`DB_USER`), senha (`DB_PASSWORD`) e o banco de dados (`DB_NAME`) especificados no `.env` existam e estejam corretamente configurados no seu PostgreSQL. - Execute o script SQL para criar as tabelas necessárias. Assumindo que o script está em `backend/src/database/create_tables.sql`:
+    `bash
+        psql -U SEU_USUARIO_POSTGRES_ADMIN -d NOME_DO_SEU_BANCO_DE_DADOS -f src/database/create_tables.sql
+        `
+    (Substitua `SEU_USUARIO_POSTGRES_ADMIN` e `NOME_DO_SEU_BANCO_DE_DADOS` pelos seus dados de acesso ao PostgreSQL com permissões para criar tabelas e o nome do banco de dados que você definiu em `DB_NAME`).
+
+4.  **Build do Frontend:**
+    Para este fluxo de desenvolvimento específico, vamos gerar a build do frontend. Navegue até a pasta do frontend e execute:
+
+    ```bash
+    # Se você estava na pasta backend:
+    cd ../frontend
+    # Se estava na raiz do projeto:
+    # cd frontend
+
+    npm run build
+    ```
+
+    Isso irá gerar os arquivos estáticos da aplicação React na pasta `frontend/build` (ou `frontend/dist`, dependendo da configuração).
+
+5.  **Rodar o Servidor Backend (Modo de Desenvolvimento):**
+    Agora, com o frontend "buildado" e o backend configurado, inicie o servidor backend:
+
+    ```bash
+    # Se você estava na pasta frontend:
+    cd ../backend
+    # Se estava na raiz do projeto:
+    # cd backend
+
+    npm run dev
+    ```
+
+    Este comando geralmente utiliza `ts-node-dev` ou `nodemon` com `ts-node` para iniciar o servidor com hot-reloading. O backend estará acessível (por padrão) em `http://localhost:3001`.
+
+    Agora você pode usar o **Postman** para enviar requisições para os endpoints da sua API backend (ex: `POST http://localhost:3001/api/auth/login`, `GET http://localhost:3001/api/assets`, etc.) e testar todas as funcionalidades.
+
+---
+
 ## Visão Geral
 
 O Assistente de Manutenção de Ativos é uma aplicação web full-stack projetada para ajudar usuários a gerenciar o ciclo de vida de manutenção de seus ativos importantes, como veículos, equipamentos e máquinas. Ele fornece uma plataforma centralizada para registrar ativos, agendar e rastrear manutenções (tanto realizadas quanto futuras), e visualizar um painel com informações relevantes sobre o estado dos ativos e suas próximas manutenções.
@@ -105,5 +197,3 @@ O backend é uma API RESTful construída com Node.js e Express.js, utilizando Ty
   ```bash
   npm start
   ```
-
-### Estrutura de Pastas do Backend (Sugestão)
