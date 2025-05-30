@@ -1,3 +1,4 @@
+// frontend/src/components/UserProfile.tsx
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import Container from '@mui/material/Container';
@@ -9,6 +10,12 @@ import Paper from '@mui/material/Paper';
 import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
 
 interface UserFormData {
   name: string;
@@ -27,23 +34,33 @@ interface UserApiResponse {
   user: User[];
 }
 
-const UserProfile = () => {
+interface UserProfileProps {
+  setIsAuthenticated: (isAuthenticated: boolean) => void;
+}
+
+const UserProfile = ({ setIsAuthenticated }: UserProfileProps) => {
   const [initialUserData, setInitialUserData] = useState<{ name: string; email: string } | null>(
     null
   );
   const [formData, setFormData] = useState<UserFormData>({
     name: '',
     email: '',
-
     newPassword: '',
     confirmNewPassword: '',
   });
 
-  const [loading, setLoading] = useState(false);
-  const [fetchLoading, setFetchLoading] = useState(true);
+  // Estados de Loading específicos
+  const [fetchLoading, setFetchLoading] = useState(true); // Para carregar dados iniciais
+  const [submitLoading, setSubmitLoading] = useState(false); // Para o submit do formulário de atualização
+  const [deleteLoading, setDeleteLoading] = useState(false); // Para a exclusão da conta
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  // Estado para o modal de confirmação de exclusão
+  const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -55,41 +72,34 @@ const UserProfile = () => {
           if (response.status === 401 || response.status === 403) navigate('/login');
           let errorMsg = 'Failed to fetch user data';
           try {
-            const errorData = await response.json();
-            if (errorData && errorData.error && typeof errorData.error === 'string')
-              errorMsg = errorData.error;
-            else if (
-              errorData &&
-              errorData.error &&
-              errorData.error.error &&
-              typeof errorData.error.error === 'string'
-            )
-              errorMsg = errorData.error.error;
-            else if (errorData && errorData.message) errorMsg = errorData.message;
-          } catch (parseErr) {
-            console.warn('Could not parse error JSON from user data API:', parseErr);
+            const d = await response.json();
+            if (d && d.error && typeof d.error === 'string') errorMsg = d.error;
+            else if (d && d.error && d.error.error && typeof d.error.error === 'string')
+              errorMsg = d.error.error;
+            else if (d && d.message) errorMsg = d.message;
+          } catch (pErr) {
+            console.warn('No JSON in user fetch err', pErr);
           }
           throw new Error(errorMsg);
         }
-        const responseData: UserApiResponse = await response.json();
-        if (responseData && Array.isArray(responseData.user) && responseData.user.length > 0) {
-          const currentUserData = responseData.user[0];
-          setFormData(prev => ({
-            ...prev,
-            name: currentUserData.name || '',
-            email: currentUserData.email || '',
-          }));
-          setInitialUserData({
-            name: currentUserData.name || '',
-            email: currentUserData.email || '',
-          });
+        const rData: UserApiResponse = await response.json();
+        if (rData && Array.isArray(rData.user) && rData.user.length > 0) {
+          const cUserData = rData.user[0];
+          setFormData(p => ({
+            ...p,
+            name: cUserData.name || '',
+            email: cUserData.email || '',
+            newPassword: '',
+            confirmNewPassword: '',
+          })); // Limpa campos de senha no load
+          setInitialUserData({ name: cUserData.name || '', email: cUserData.email || '' });
         } else {
           throw new Error('User data not found in API response.');
         }
       } catch (err) {
         if (err instanceof Error) setError(err.message);
         else if (typeof err === 'string') setError(err);
-        else setError('Could not load user profile due to an unexpected error.');
+        else setError('Could not load user profile.');
       } finally {
         setFetchLoading(false);
       }
@@ -105,49 +115,102 @@ const UserProfile = () => {
     event.preventDefault();
     setError(null);
     setSuccess(null);
-
     if (formData.newPassword && formData.newPassword !== formData.confirmNewPassword) {
       setError('New passwords do not match.');
       return;
     }
-
     interface UpdatePayload {
       name?: string;
       email?: string;
       password?: string;
     }
-
     const payload: UpdatePayload = {};
-    let hasNonPasswordChanges = false;
+    let hasChanges = false;
 
-    if (initialUserData && formData.name.trim() !== initialUserData.name) {
+    if (
+      initialUserData &&
+      formData.name.trim() !== initialUserData.name &&
+      formData.name.trim() !== ''
+    ) {
       payload.name = formData.name.trim();
-      hasNonPasswordChanges = true;
+      hasChanges = true;
     }
-    if (initialUserData && formData.email.trim() !== initialUserData.email) {
+    if (
+      initialUserData &&
+      formData.email.trim() !== initialUserData.email &&
+      formData.email.trim() !== ''
+    ) {
       payload.email = formData.email.trim();
-      hasNonPasswordChanges = true;
+      hasChanges = true;
     }
-
     if (formData.newPassword && formData.newPassword.trim() !== '') {
       payload.password = formData.newPassword;
+      hasChanges = true;
     }
-
-    if (!hasNonPasswordChanges && !payload.password) {
+    if (!hasChanges) {
       setError('No changes to save.');
       return;
     }
 
-    setLoading(true);
+    setSubmitLoading(true); // USA setSubmitLoading
     try {
       const response = await fetch('/api/users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       if (!response.ok) {
-        let backendErrorMessage = 'Failed to update profile.';
+        let errMsg = 'Failed to update profile.';
+        try {
+          const eData = await response.json();
+          if (eData && eData.error && typeof eData.error === 'string') errMsg = eData.error;
+          else if (
+            eData &&
+            eData.error &&
+            eData.error.error &&
+            typeof eData.error.error === 'string'
+          )
+            errMsg = eData.error.error;
+          else if (eData && eData.message) errMsg = eData.message;
+        } catch (pErr) {
+          console.warn('No JSON in profile update err', pErr);
+          if (response.statusText) errMsg = response.statusText;
+        }
+        throw new Error(errMsg);
+      }
+      const uUserData = await response.json();
+      setSuccess('Profile updated successfully!');
+      let uName = formData.name;
+      let uEmail = formData.email;
+      if (uUserData && Array.isArray(uUserData.user) && uUserData.user.length > 0) {
+        const uUser = uUserData.user[0];
+        uName = uUser.name || formData.name;
+        uEmail = uUser.email || formData.email;
+      } else if (uUserData && uUserData.name && uUserData.email) {
+        uName = uUserData.name || formData.name;
+        uEmail = uUserData.email || formData.email;
+      }
+      if (payload.name) uName = payload.name;
+      if (payload.email) uEmail = payload.email;
+      setFormData({ name: uName, email: uEmail, newPassword: '', confirmNewPassword: '' });
+      setInitialUserData({ name: uName, email: uEmail });
+    } catch (err) {
+      if (err instanceof Error) setError(err.message);
+      else if (typeof err === 'string') setError(err);
+      else setError('Failed to update profile.');
+    } finally {
+      setSubmitLoading(false);
+    } // USA setSubmitLoading
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteError(null);
+    setDeleteLoading(true);
+    try {
+      const response = await fetch('/api/users', { method: 'DELETE' });
+      if (!response.ok) {
+        // ... (tratamento de erro da API) ...
+        let backendErrorMessage = 'Failed to delete account.';
         try {
           const errorData = await response.json();
           if (errorData && errorData.error && typeof errorData.error === 'string')
@@ -161,52 +224,33 @@ const UserProfile = () => {
             backendErrorMessage = errorData.error.error;
           else if (errorData && errorData.message) backendErrorMessage = errorData.message;
         } catch (parseErr) {
-          console.warn('Could not parse error JSON from profile update API:', parseErr);
+          console.warn('Could not parse error JSON from delete account API:', parseErr);
           if (response.statusText) backendErrorMessage = response.statusText;
         }
         throw new Error(backendErrorMessage);
       }
 
-      const updatedUserDataResponse = await response.json();
-      setSuccess('Profile updated successfully!');
+      // AGORA setIsAuthenticated(false) SERÁ CHAMADO, POIS A PROP É OBRIGATÓRIA
+      setIsAuthenticated(false);
 
-      let updatedName = formData.name;
-      let updatedEmail = formData.email;
-
-      if (
-        updatedUserDataResponse &&
-        Array.isArray(updatedUserDataResponse.user) &&
-        updatedUserDataResponse.user.length > 0
-      ) {
-        const updatedUser = updatedUserDataResponse.user[0];
-        updatedName = updatedUser.name || formData.name;
-        updatedEmail = updatedUser.email || formData.email;
-      } else if (
-        updatedUserDataResponse &&
-        updatedUserDataResponse.name &&
-        updatedUserDataResponse.email
-      ) {
-        updatedName = updatedUserDataResponse.name || formData.name;
-        updatedEmail = updatedUserDataResponse.email || formData.email;
-      }
-
-      if (payload.name) updatedName = payload.name;
-      if (payload.email) updatedEmail = payload.email;
-
-      setFormData({
-        name: updatedName,
-        email: updatedEmail,
-        newPassword: '',
-        confirmNewPassword: '',
-      });
-      setInitialUserData({ name: updatedName, email: updatedEmail });
+      alert('Your account has been successfully deleted.');
+      navigate('/login');
     } catch (err) {
-      if (err instanceof Error) setError(err.message);
-      else if (typeof err === 'string') setError(err);
-      else setError('Failed to update profile due to an unexpected error.');
+      if (err instanceof Error) setDeleteError(err.message);
+      else if (typeof err === 'string') setDeleteError(err);
+      else setDeleteError('An unexpected error occurred while deleting your account.');
     } finally {
-      setLoading(false);
+      setDeleteLoading(false);
     }
+    setOpenDeleteConfirm(false);
+  };
+
+  const handleClickOpenDeleteConfirm = () => {
+    setOpenDeleteConfirm(true);
+    setDeleteError(null);
+  };
+  const handleCloseDeleteConfirm = () => {
+    setOpenDeleteConfirm(false);
   };
 
   if (fetchLoading) {
@@ -219,7 +263,7 @@ const UserProfile = () => {
 
   return (
     <Container component="main" maxWidth="sm">
-      <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, mt: 4 }}>
+      <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, mt: 4, mb: 4 }}>
         <Typography component="h1" variant="h4" align="center" gutterBottom>
           Account Settings
         </Typography>
@@ -233,6 +277,7 @@ const UserProfile = () => {
             {success}
           </Alert>
         )}
+
         <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 2 }}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12 }}>
@@ -242,7 +287,7 @@ const UserProfile = () => {
                 fullWidth
                 value={formData.name}
                 onChange={handleChange}
-                disabled={loading || fetchLoading}
+                disabled={submitLoading || fetchLoading}
               />
             </Grid>
             <Grid size={{ xs: 12 }}>
@@ -253,7 +298,7 @@ const UserProfile = () => {
                 fullWidth
                 value={formData.email}
                 onChange={handleChange}
-                disabled={loading || fetchLoading}
+                disabled={submitLoading || fetchLoading}
               />
             </Grid>
             <Grid size={{ xs: 12 }}>
@@ -261,11 +306,6 @@ const UserProfile = () => {
                 Change Password (optional)
               </Typography>
             </Grid>
-            {/* CAMPO "CURRENT PASSWORD" REMOVIDO
-            <Grid size={{ xs: 12 }}>
-              <TextField name="currentPassword" label="Current Password" type="password" fullWidth value={formData.currentPassword || ''} onChange={handleChange} disabled={loading || fetchLoading} helperText="Required if changing password"/>
-            </Grid>
-            */}
             <Grid size={{ xs: 12 }}>
               <TextField
                 name="newPassword"
@@ -274,7 +314,7 @@ const UserProfile = () => {
                 fullWidth
                 value={formData.newPassword || ''}
                 onChange={handleChange}
-                disabled={loading || fetchLoading}
+                disabled={submitLoading || fetchLoading}
               />
             </Grid>
             <Grid size={{ xs: 12 }}>
@@ -285,7 +325,7 @@ const UserProfile = () => {
                 fullWidth
                 value={formData.confirmNewPassword || ''}
                 onChange={handleChange}
-                disabled={loading || fetchLoading}
+                disabled={submitLoading || fetchLoading}
                 error={
                   !!(
                     formData.newPassword &&
@@ -308,12 +348,58 @@ const UserProfile = () => {
             fullWidth
             variant="contained"
             sx={{ mt: 3, mb: 2 }}
-            disabled={loading || fetchLoading}
+            disabled={submitLoading || fetchLoading}
           >
-            {loading ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
+            {submitLoading ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
           </Button>
         </Box>
+
+        <Divider sx={{ my: 3 }} />
+
+        <Box sx={{ textAlign: 'center' }}>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={handleClickOpenDeleteConfirm}
+            disabled={submitLoading || fetchLoading || deleteLoading}
+          >
+            Delete My Account
+          </Button>
+          {deleteError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {deleteError}
+            </Alert>
+          )}
+        </Box>
       </Paper>
+
+      <Dialog open={openDeleteConfirm} onClose={handleCloseDeleteConfirm}>
+        <DialogTitle>{'Confirm Account Deletion'}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you absolutely sure you want to delete your account? All of your assets and
+            maintenance records will be permanently removed. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteConfirm} color="primary" disabled={deleteLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteAccount}
+            color="error"
+            variant="contained"
+            autoFocus
+            disabled={deleteLoading}
+          >
+            {deleteLoading ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              'Yes, Delete My Account'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

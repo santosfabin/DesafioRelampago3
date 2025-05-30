@@ -1,16 +1,22 @@
+// frontend/src/components/Register.tsx
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router';
+import { useNavigate, Link as RouterLink } from 'react-router'; // Assumindo react-router-dom
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
-import MuiLink from '@mui/material/Link';
-import Grid from '@mui/material/Grid';
+import MuiLink from '@mui/material/Link'; // MUI Link
+import Grid from '@mui/material/Grid'; // Usando size prop
 import Box from '@mui/material/Box';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import Alert from '@mui/material/Alert';
+// Ícones para o olhinho da senha
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -20,6 +26,17 @@ const Register = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Estado para controlar a visibilidade da senha
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleClickShowPassword = () => {
+    setShowPassword(prev => !prev);
+  };
+
+  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault(); // Evita que o campo perca o foco
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -32,43 +49,35 @@ const Register = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
       });
-
       if (!response.ok) {
         let backendErrorMessage = 'Registration failed. Please check your input or try again.';
         try {
           const errorData = await response.json();
-          console.log('Error data from backend:', errorData);
+          // console.log("Error data from backend:", errorData);
           if (errorData) {
-            if (errorData.error && typeof errorData.error === 'string') {
+            if (errorData.error && typeof errorData.error === 'string')
               backendErrorMessage = errorData.error;
-            } else if (
+            else if (
               errorData.error &&
               errorData.error.error &&
               typeof errorData.error.error === 'string'
-            ) {
+            )
               backendErrorMessage = errorData.error.error;
-            } else if (errorData.message && typeof errorData.message === 'string') {
+            else if (errorData.message && typeof errorData.message === 'string')
               backendErrorMessage = errorData.message;
-            }
           }
         } catch (parseError) {
           console.warn('Could not parse error JSON from registration API:', parseError);
-
           if (response.statusText) backendErrorMessage = response.statusText;
         }
         throw new Error(backendErrorMessage);
       }
-
       setSuccess('Registration successful! Please log in.');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else if (typeof err === 'string') {
-        setError(err);
-      } else {
-        setError('An unexpected error occurred during registration.');
-      }
+      if (err instanceof Error) setError(err.message);
+      else if (typeof err === 'string') setError(err);
+      else setError('An unexpected error occurred during registration.');
     } finally {
       setLoading(false);
     }
@@ -76,14 +85,7 @@ const Register = () => {
 
   return (
     <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
+      <Box sx={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
           <LockOutlinedIcon />
         </Avatar>
@@ -135,12 +137,28 @@ const Register = () => {
                 fullWidth
                 name="password"
                 label="Password"
-                type="password"
+                type={showPassword ? 'text' : 'password'} // Alterna o tipo do input
                 id="password"
                 autoComplete="new-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 disabled={loading}
+                InputProps={{
+                  // Adiciona o ícone aqui
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="toggle password visibility"
+                        onClick={handleClickShowPassword}
+                        onMouseDown={handleMouseDownPassword}
+                        edge="end"
+                        disabled={loading}
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Grid>
           </Grid>
@@ -155,7 +173,6 @@ const Register = () => {
           </Button>
           <Grid container justifyContent="flex-end">
             <Grid>
-              {' '}
               <MuiLink component={RouterLink} to="/login" variant="body2">
                 Already have an account? Sign in
               </MuiLink>

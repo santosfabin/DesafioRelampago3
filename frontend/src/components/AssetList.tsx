@@ -1,3 +1,5 @@
+// frontend/src/components/AssetList.tsx
+
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router';
 import Container from '@mui/material/Container';
@@ -13,13 +15,15 @@ import TableRow from '@mui/material/TableRow';
 import IconButton from '@mui/material/IconButton';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import VisibilityIcon from '@mui/icons-material/Visibility';
+// import VisibilityIcon from '@mui/icons-material/Visibility'; // Removido
+import BuildIcon from '@mui/icons-material/Build'; // Adicionado
 import AddIcon from '@mui/icons-material/Add';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import { visuallyHidden } from '@mui/utils';
+import Tooltip from '@mui/material/Tooltip'; // Adicionado para Tooltips
 
 interface Asset {
   id: string;
@@ -41,7 +45,6 @@ const AssetList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'name', direction: 'asc' });
 
   const fetchAssets = useCallback(async () => {
@@ -71,7 +74,6 @@ const AssetList = () => {
       } else if (Array.isArray(responseData)) {
         fetchedAssets = responseData;
       }
-
       if (!Array.isArray(fetchedAssets)) {
         console.error('AssetList: Erro - fetchedAssets não é um array!', fetchedAssets);
         setError('Formato de dados inesperado recebido da API.');
@@ -98,17 +100,13 @@ const AssetList = () => {
   };
 
   const sortedAssetsToDisplay = useMemo(() => {
-    if (!sortConfig.key) {
-      return originalAssets;
-    }
+    if (!sortConfig.key) return originalAssets;
     const sortableItems = [...originalAssets];
     sortableItems.sort((a, b) => {
       const valA = a[sortConfig.key!];
       const valB = b[sortConfig.key!];
-
       if (valA === null || valA === undefined) return 1;
       if (valB === null || valB === undefined) return -1;
-
       let comparison = 0;
       if (typeof valA === 'number' && typeof valB === 'number') {
         comparison = valA - valB;
@@ -142,7 +140,6 @@ const AssetList = () => {
           }
           throw new Error(errorMsg);
         }
-
         setOriginalAssets(prevAssets => prevAssets.filter(asset => asset.id !== assetId));
       } catch (err: unknown) {
         let messageToShow = 'An error occurred during deletion.';
@@ -162,12 +159,7 @@ const AssetList = () => {
     );
   }
 
-  const headCells: {
-    id: keyof Asset;
-    label: string;
-    numeric: boolean;
-    disablePadding?: boolean;
-  }[] = [
+  const headCells: { id: keyof Asset; label: string; numeric: boolean }[] = [
     { id: 'name', numeric: false, label: 'Name' },
     { id: 'description', numeric: false, label: 'Description' },
     { id: 'importance', numeric: true, label: 'Importance' },
@@ -209,14 +201,15 @@ const AssetList = () => {
       )}
       {assetsToDisplay.length > 0 && (
         <TableContainer component={Paper}>
-          <Table sx={{ minWidth: 650 }} aria-label="simple table">
+          <Table sx={{ minWidth: 650 }} aria-label="assets table">
+            {' '}
+            {/* Mudado aria-label */}
             <TableHead>
               <TableRow>
                 {headCells.map(headCell => (
                   <TableCell
                     key={headCell.id}
                     align={headCell.numeric ? 'right' : 'left'}
-                    padding={headCell.disablePadding ? 'none' : 'normal'}
                     sortDirection={sortConfig.key === headCell.id ? sortConfig.direction : false}
                   >
                     <TableSortLabel
@@ -253,30 +246,33 @@ const AssetList = () => {
                     <TableCell>{asset.description}</TableCell>
                     <TableCell align="right">{asset.importance}</TableCell>
                     <TableCell align="center">
-                      <IconButton
-                        aria-label="maintenances"
-                        color="default"
-                        onClick={() => navigate(`/assets/${asset.id}/maintenances`)}
-                        title="View Maintenances"
-                      >
-                        <VisibilityIcon />
-                      </IconButton>
-                      <IconButton
-                        aria-label="edit"
-                        color="primary"
-                        onClick={() => navigate(`/assets/${asset.id}`)}
-                        title="Edit Asset"
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        aria-label="delete"
-                        color="error"
-                        onClick={() => handleDelete(asset.id)}
-                        title="Delete Asset"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      <Tooltip title="View Maintenances">
+                        <IconButton
+                          aria-label="maintenances"
+                          color="default"
+                          onClick={() => navigate(`/assets/${asset.id}/maintenances`)}
+                        >
+                          <BuildIcon /> {/* ÍCONE ALTERADO */}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Edit Asset">
+                        <IconButton
+                          aria-label="edit"
+                          color="primary"
+                          onClick={() => navigate(`/assets/${asset.id}`)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete Asset">
+                        <IconButton
+                          aria-label="delete"
+                          color="error"
+                          onClick={() => handleDelete(asset.id)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 );

@@ -1,22 +1,26 @@
+// frontend/src/App.tsx
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router'; // Certifique-se que é react-router-dom
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 
+// Layout
 import MainLayout from './components/layout/MainLayout';
 
+// Auth Pages
 import Login from './components/Login';
 import Register from './components/Register';
 import Logout from './components/Logout';
 
+// Content Pages
 import LandingPage from './pages/LandingPage';
 import AssetList from './components/AssetList';
 import AssetForm from './components/AssetForm';
 import MaintenanceList from './components/MaintenanceList';
 import MaintenanceForm from './components/MaintenanceForm';
-import UserProfile from './components/UserProfile';
+import UserProfile from './components/UserProfile'; // <<< ADICIONE O IMPORT
 
 const darkTheme = createTheme({
   palette: {
@@ -74,7 +78,7 @@ function App() {
             element={
               <MainLayout
                 isAuthenticated={isAuthenticated}
-                setIsAuthenticated={setIsAuthenticated}
+                setIsAuthenticated={setIsAuthenticated} // Passa para MainLayout (que passa para Header)
               />
             }
           >
@@ -94,7 +98,7 @@ function App() {
               element={!isAuthenticated ? <Register /> : <Navigate to="/" replace />}
             />
 
-            {/* Rotas protegidas - só renderizam se isAuthenticated for true */}
+            {/* Rotas Protegidas - só renderizam se isAuthenticated for true */}
             {isAuthenticated && (
               <>
                 <Route path="/" element={<LandingPage />} />
@@ -103,7 +107,6 @@ function App() {
                 <Route path="/assets/:id" element={<AssetForm />} />
                 <Route path="/assets/:assetId/maintenances" element={<MaintenanceList />} />
                 <Route path="/assets/:assetId/maintenances/new" element={<MaintenanceForm />} />
-                <Route path="/profile" element={<UserProfile />} />
                 <Route
                   path="/assets/:assetId/maintenances/:maintenanceId"
                   element={<MaintenanceForm />}
@@ -112,15 +115,49 @@ function App() {
                   path="/logout"
                   element={<Logout setIsAuthenticated={setIsAuthenticated} />}
                 />
+
+                {/* ================================================================= */}
+                {/* CORREÇÃO AQUI: Passar setIsAuthenticated para UserProfile        */}
+                {/* ================================================================= */}
+                <Route
+                  path="/profile"
+                  element={<UserProfile setIsAuthenticated={setIsAuthenticated} />}
+                />
               </>
             )}
           </Route>
 
-          {/* Se não autenticado e nenhuma rota acima bateu, redireciona para login */}
+          {/* Redirecionamentos catch-all (manter fora da rota com MainLayout se MainLayout não deve aparecer aqui) */}
           {!isAuthenticated && <Route path="*" element={<Navigate to="/login" replace />} />}
 
-          {/* Se autenticado e nenhuma rota acima bateu (e não é /login ou /register), redireciona para / */}
-          {isAuthenticated && <Route path="*" element={<Navigate to="/" replace />} />}
+          {/* Se autenticado e nenhuma rota protegida acima bateu, redireciona para a home */}
+          {/* Este precisa estar depois das rotas protegidas e da rota de MainLayout */}
+          {isAuthenticated && (
+            <Route
+              path="*"
+              element={
+                <Routes>
+                  {' '}
+                  {/* Nested Routes para que este catch-all não sobrescreva o MainLayout */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              }
+            />
+          )}
+          {/* Uma forma mais simples para o catch-all de autenticado, se todas as rotas autenticadas estão no MainLayout:
+          {isAuthenticated && (
+             <Route path="*" element={<Navigate to="/" replace />} /> // Colocar dentro do bloco isAuthenticated, após todas as rotas específicas
+          )}
+          Considerando a estrutura atual, o catch-all para !isAuthenticated está ok.
+          Para isAuthenticated, se a rota não for encontrada DENTRO do <Route element={<MainLayout.../>}>,
+          o React Router pode não ter uma rota para renderizar, resultando em página em branco,
+          a menos que MainLayout tenha seu próprio catch-all interno.
+          A forma mais simples de catch-all para usuário logado, se todas as rotas protegidas já estão listadas:
+          Se a rota /profile está dentro do grupo isAuthenticated, então o catch-all final
+          para usuários logados já pode ser apenas <Route path="*" element={<Navigate to="/" replace />} />
+          colocado ao final do bloco {isAuthenticated && (<> ... </>) }
+          Vamos simplificar o redirecionamento catch-all para usuários logados:
+          */}
         </Routes>
       </Router>
     </ThemeProvider>
