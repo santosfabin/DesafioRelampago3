@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react'; // Type-only import
-import { useNavigate } from 'react-router';
+import type { FormEvent } from 'react';
+import { useNavigate, Link as RouterLink } from 'react-router';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
-import Link from '@mui/material/Link';
+import MuiLink from '@mui/material/Link';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
@@ -27,16 +27,38 @@ const Register = () => {
     setSuccess(null);
     setLoading(true);
     try {
-      // ... (fetch logic remains the same)
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
       });
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Registration failed');
+        let backendErrorMessage = 'Registration failed. Please check your input or try again.';
+        try {
+          const errorData = await response.json();
+          console.log('Error data from backend:', errorData);
+          if (errorData) {
+            if (errorData.error && typeof errorData.error === 'string') {
+              backendErrorMessage = errorData.error;
+            } else if (
+              errorData.error &&
+              errorData.error.error &&
+              typeof errorData.error.error === 'string'
+            ) {
+              backendErrorMessage = errorData.error.error;
+            } else if (errorData.message && typeof errorData.message === 'string') {
+              backendErrorMessage = errorData.message;
+            }
+          }
+        } catch (parseError) {
+          console.warn('Could not parse error JSON from registration API:', parseError);
+
+          if (response.statusText) backendErrorMessage = response.statusText;
+        }
+        throw new Error(backendErrorMessage);
       }
+
       setSuccess('Registration successful! Please log in.');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err: unknown) {
@@ -69,20 +91,18 @@ const Register = () => {
           Sign up
         </Typography>
         {error && (
-          <Alert severity="error" sx={{ width: '100%', mt: 2 }}>
+          <Alert severity="error" sx={{ width: '100%', mt: 2 }} onClose={() => setError(null)}>
             {error}
           </Alert>
         )}
         {success && (
-          <Alert severity="success" sx={{ width: '100%', mt: 2 }}>
+          <Alert severity="success" sx={{ width: '100%', mt: 2 }} onClose={() => setSuccess(null)}>
             {success}
           </Alert>
         )}
         <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 3 }}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12 }}>
-              {' '}
-              {/* Changed to size prop */}
               <TextField
                 autoComplete="name"
                 name="name"
@@ -97,8 +117,6 @@ const Register = () => {
               />
             </Grid>
             <Grid size={{ xs: 12 }}>
-              {' '}
-              {/* Changed to size prop */}
               <TextField
                 required
                 fullWidth
@@ -112,8 +130,6 @@ const Register = () => {
               />
             </Grid>
             <Grid size={{ xs: 12 }}>
-              {' '}
-              {/* Changed to size prop */}
               <TextField
                 required
                 fullWidth
@@ -140,10 +156,9 @@ const Register = () => {
           <Grid container justifyContent="flex-end">
             <Grid>
               {' '}
-              {/* Similar to Login.tsx, if sizing needed, use size prop */}
-              <Link href="/login" variant="body2">
+              <MuiLink component={RouterLink} to="/login" variant="body2">
                 Already have an account? Sign in
-              </Link>
+              </MuiLink>
             </Grid>
           </Grid>
         </Box>

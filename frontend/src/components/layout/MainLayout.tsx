@@ -1,22 +1,23 @@
+// frontend/src/components/layout/MainLayout.tsx
+import type { Dispatch, SetStateAction } from 'react'; // ReactNode pode ser removido se children for removido
+import { Outlet } from 'react-router';
 import Box from '@mui/material/Box';
 import Header from './Header';
 import Footer from './Footer';
 
-// frontend/src/components/layout/MainLayout.tsx
-import type { ReactNode } from 'react';
-import { Outlet } from 'react-router';
-// ... outros imports
-
 interface MainLayoutProps {
-  children?: ReactNode; // Tornar children opcional se nem sempre é passado diretamente
+  // children?: ReactNode; // REMOVIDO SE NÃO FOR USADO DIRETAMENTE
+  isAuthenticated: boolean;
+  setIsAuthenticated: Dispatch<SetStateAction<boolean>>;
 }
 
-const MainLayout = ({ children }: MainLayoutProps) => {
+// 'children' removido dos parâmetros se não for usado
+const MainLayout = ({ isAuthenticated, setIsAuthenticated }: MainLayoutProps) => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Header />
+      <Header isAuthenticated={isAuthenticated} setIsAuthenticated={setIsAuthenticated} />
       <Box component="main" sx={{ flexGrow: 1, py: 3 }}>
-        {children ? children : <Outlet />} {/* Prioriza children se passado, senão usa Outlet */}
+        <Outlet /> {/* Outlet renderiza as rotas filhas */}
       </Box>
       <Footer />
     </Box>

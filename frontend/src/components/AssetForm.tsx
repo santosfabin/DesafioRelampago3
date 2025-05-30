@@ -1,8 +1,6 @@
-// frontend/src/components/AssetForm.tsx
-
-import { useState, useEffect, useCallback } from 'react'; // Adicionado useCallback
-import type { FormEvent } from 'react'; // Já deve estar assim
-import { useParams, useNavigate } from 'react-router'; // Corrigido para react-router-dom
+import { useState, useEffect, useCallback } from 'react';
+import type { FormEvent } from 'react';
+import { useParams, useNavigate } from 'react-router';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
@@ -10,13 +8,12 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Select from '@mui/material/Select';
-import type { SelectChangeEvent } from '@mui/material/Select'; // Já deve estar assim
+import type { SelectChangeEvent } from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
-// Grid não está sendo usado, removi o import se estava lá por engano em alguma versão anterior.
 
 interface AssetFormData {
   name: string;
@@ -24,38 +21,43 @@ interface AssetFormData {
   importance: string;
 }
 
-// Para o payload da API, pode ser útil ter um tipo separado se for diferente do FormData
 interface AssetPayload {
   name: string;
-  description: string;
+  description?: string;
   importance: number;
 }
 
+interface Asset {
+  id: string;
+  user_id?: string;
+  name: string;
+  description: string;
+  importance: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 const AssetForm = () => {
-  const { id: assetId } = useParams<{ id?: string }>();
+  const { id: assetIdParam } = useParams<{ id?: string }>();
   const navigate = useNavigate();
-  const isEditMode = Boolean(assetId);
+  const isEditMode = Boolean(assetIdParam);
 
   const [formData, setFormData] = useState<AssetFormData>({
     name: '',
     description: '',
     importance: '3',
   });
-  const [loading, setLoading] = useState(false); // Loading para fetch inicial
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [submitLoading, setSubmitLoading] = useState(false); // Loading para o submit do formulário
+  const [submitLoading, setSubmitLoading] = useState(false);
 
   const fetchAsset = useCallback(async () => {
-    if (isEditMode && assetId) {
+    if (isEditMode && assetIdParam) {
       setLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/assets/${assetId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await fetch(`/api/assets/${assetIdParam}`);
+
         if (!response.ok) {
           if (response.status === 401 || response.status === 403) {
             navigate('/login');
@@ -64,21 +66,47 @@ const AssetForm = () => {
           let errorMsg = 'Failed to fetch asset details';
           try {
             const errorData = await response.json();
-            if (errorData && errorData.message) errorMsg = errorData.message;
+            if (errorData && errorData.error) errorMsg = errorData.error;
+            else if (errorData && errorData.message) errorMsg = errorData.message;
           } catch (_parseError) {
             /* Ignore */
           }
           throw new Error(errorMsg);
         }
-        const data = await response.json();
-        const assetData = data.body || data;
-        setFormData({
-          name: assetData.name,
-          description: assetData.description,
-          importance: assetData.importance.toString(),
-        });
+        const responseData = await response.json();
+
+        let assetParaFormulario: Asset | undefined = undefined;
+
+        if (responseData && Array.isArray(responseData.asset) && responseData.asset.length > 0) {
+          assetParaFormulario = responseData.asset[0];
+        } else if (
+          responseData &&
+          typeof responseData === 'object' &&
+          !Array.isArray(responseData) &&
+          responseData.id
+        ) {
+          assetParaFormulario = responseData as Asset;
+        }
+
+        if (
+          assetParaFormulario &&
+          typeof assetParaFormulario.importance !== 'undefined' &&
+          assetParaFormulario.importance !== null
+        ) {
+          setFormData({
+            name: assetParaFormulario.name || '',
+            description: assetParaFormulario.description || '',
+            importance: assetParaFormulario.importance.toString(),
+          });
+        } else {
+          console.error(
+            'AssetForm (fetchAsset) - Asset não encontrado ou campo "importance" ausente:',
+            assetParaFormulario
+          );
+          setError('Failed to load asset details correctly (missing data or importance).');
+          setFormData({ name: '', description: '', importance: '3' });
+        }
       } catch (err: unknown) {
-        // <--- CORRIGIDO E PADRONIZADO
         if (err instanceof Error) {
           setError(err.message);
         } else if (typeof err === 'string') {
@@ -86,15 +114,17 @@ const AssetForm = () => {
         } else {
           setError('An unexpected error occurred while fetching asset details.');
         }
+
+        setFormData({ name: '', description: '', importance: '3' });
       } finally {
         setLoading(false);
       }
     }
-  }, [assetId, isEditMode, navigate]); // Dependências do useCallback
+  }, [assetIdParam, isEditMode, navigate]);
 
   useEffect(() => {
     fetchAsset();
-  }, [fetchAsset]); // useEffect depende da função memoizada
+  }, [fetchAsset]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
@@ -108,23 +138,26 @@ const AssetForm = () => {
     setSubmitLoading(true);
     setError(null);
 
+    if (!formData.name.trim()) {
+      setError('Asset Name is required.');
+      setSubmitLoading(false);
+      return;
+    }
+
     const payload: AssetPayload = {
-      // Usando o tipo AssetPayload
       name: formData.name,
       description: formData.description,
       importance: parseInt(formData.importance, 10),
     };
 
     try {
-      const token = localStorage.getItem('token');
-      const url = isEditMode ? `/api/assets/${assetId}` : '/api/assets';
+      const url = isEditMode ? `/api/assets/${assetIdParam}` : '/api/assets';
       const method = isEditMode ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
@@ -133,7 +166,18 @@ const AssetForm = () => {
         let errorMsg = `Failed to ${isEditMode ? 'update' : 'create'} asset`;
         try {
           const errorData = await response.json();
-          if (errorData && errorData.message) errorMsg = errorData.message;
+          if (errorData && errorData.error && typeof errorData.error === 'string') {
+            errorMsg = errorData.error;
+          } else if (
+            errorData &&
+            errorData.error &&
+            errorData.error.error &&
+            typeof errorData.error.error === 'string'
+          ) {
+            errorMsg = errorData.error.error;
+          } else if (errorData && errorData.message) {
+            errorMsg = errorData.message;
+          }
         } catch (_parseError) {
           /* Ignore */
         }
@@ -141,7 +185,6 @@ const AssetForm = () => {
       }
       navigate('/assets');
     } catch (err: unknown) {
-      // <--- CORRIGIDO
       if (err instanceof Error) {
         setError(err.message);
       } else if (typeof err === 'string') {
@@ -156,8 +199,7 @@ const AssetForm = () => {
     }
   };
 
-  if (loading) {
-    // Loading para o fetch inicial dos dados do asset em modo de edição
+  if (loading && isEditMode) {
     return (
       <Container sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
         <CircularProgress />
@@ -167,12 +209,14 @@ const AssetForm = () => {
 
   return (
     <Container maxWidth="md">
-      <Paper sx={{ p: 3, mt: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mt: 3 }}>
+        {' '}
+        {/* Padding responsivo */}
+        <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 2 }}>
           {isEditMode ? 'Edit Asset' : 'Create New Asset'}
         </Typography>
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
             {error}
           </Alert>
         )}
@@ -186,7 +230,8 @@ const AssetForm = () => {
             name="name"
             value={formData.name}
             onChange={handleChange}
-            disabled={submitLoading} // Desabilitado durante o submit do formulário
+            disabled={submitLoading}
+            autoFocus={!isEditMode}
           />
           <TextField
             margin="normal"
@@ -226,18 +271,15 @@ const AssetForm = () => {
               ))}
             </Select>
           </FormControl>
-          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <Button
-              variant="outlined"
-              onClick={() => navigate('/assets')}
-              sx={{ mr: 2 }}
-              disabled={submitLoading}
-            >
+          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+            {' '}
+            {/* Adicionado gap */}
+            <Button variant="outlined" onClick={() => navigate('/assets')} disabled={submitLoading}>
               Cancel
             </Button>
             <Button type="submit" variant="contained" color="primary" disabled={submitLoading}>
               {submitLoading ? (
-                <CircularProgress size={24} />
+                <CircularProgress size={24} color="inherit" />
               ) : isEditMode ? (
                 'Save Changes'
               ) : (

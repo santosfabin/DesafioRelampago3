@@ -2,22 +2,20 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import CircularProgress from '@mui/material/CircularProgress';
+import Box from '@mui/material/Box';
 
-// Layout
 import MainLayout from './components/layout/MainLayout';
 
-// Auth Pages
 import Login from './components/Login';
 import Register from './components/Register';
-import Logout from './components/Logout'; // Assuming Logout component handles navigation
+import Logout from './components/Logout';
 
-// Content Pages
-import LandingPage from './pages/LandingPage'; // New Landing Page
+import LandingPage from './pages/LandingPage';
 import AssetList from './components/AssetList';
 import AssetForm from './components/AssetForm';
 import MaintenanceList from './components/MaintenanceList';
 import MaintenanceForm from './components/MaintenanceForm';
-// Removed Dashboard import as LandingPage will serve as the initial authenticated page
 
 const darkTheme = createTheme({
   palette: {
@@ -27,82 +25,100 @@ const darkTheme = createTheme({
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      setIsAuthenticated(true);
-    } else {
-      setIsAuthenticated(false);
-    }
-  }, []); // Re-run on mount
-
-  // This effect will re-check authentication status whenever the token changes in localStorage
-  // This is a simple way to react to login/logout from other components
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const token = localStorage.getItem('token');
-      setIsAuthenticated(!!token);
+    const checkAuthStatus = async () => {
+      try {
+        const response = await fetch('/api/login/checkLogin');
+        if (response.ok) {
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        console.error('Error checking authentication status:', error);
+        setIsAuthenticated(false);
+      } finally {
+        setAuthChecked(true);
+      }
     };
-
-    window.addEventListener('storage', handleStorageChange); // Listen for changes in other tabs
-
-    // Custom event for same-tab updates (e.g., after login/logout)
-    const handleTokenChange = () => {
-      handleStorageChange();
-    };
-    window.addEventListener('tokenChanged', handleTokenChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('tokenChanged', handleTokenChange);
-    };
+    checkAuthStatus();
   }, []);
+
+  if (!authChecked) {
+    return (
+      <ThemeProvider theme={darkTheme}>
+        <CssBaseline />
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '100vh',
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
       <Router>
         <Routes>
-          {/* Public routes accessible always, but MainLayout header will adapt */}
-          <Route element={<MainLayout />}>
-            <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
-            <Route path="/register" element={<Register />} />
+          <Route
+            element={
+              <MainLayout
+                isAuthenticated={isAuthenticated}
+                setIsAuthenticated={setIsAuthenticated}
+              />
+            }
+          >
+            {/* Rotas públicas ou que redirecionam se autenticado */}
+            <Route
+              path="/login"
+              element={
+                !isAuthenticated ? (
+                  <Login setIsAuthenticated={setIsAuthenticated} />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/register"
+              element={!isAuthenticated ? <Register /> : <Navigate to="/" replace />}
+            />
+
+            {/* Rotas protegidas - só renderizam se isAuthenticated for true */}
+            {isAuthenticated && (
+              <>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/assets" element={<AssetList />} />
+                <Route path="/assets/new" element={<AssetForm />} />
+                <Route path="/assets/:id" element={<AssetForm />} />
+                <Route path="/assets/:assetId/maintenances" element={<MaintenanceList />} />
+                <Route path="/assets/:assetId/maintenances/new" element={<MaintenanceForm />} />
+                <Route
+                  path="/assets/:assetId/maintenances/:maintenanceId"
+                  element={<MaintenanceForm />}
+                />
+                <Route
+                  path="/logout"
+                  element={<Logout setIsAuthenticated={setIsAuthenticated} />}
+                />
+              </>
+            )}
           </Route>
 
-          {/* Logout route - can be outside or inside MainLayout depending on desired UI */}
-          {/* If Logout component renders UI, it should be within MainLayout */}
-          {/* If it's just logic, its placement is less critical for UI */}
-          <Route
-            path="/logout"
-            element={
-              <MainLayout>
-                <Logout setIsAuthenticated={setIsAuthenticated} />
-              </MainLayout>
-            }
-          />
+          {/* Se não autenticado e nenhuma rota acima bateu, redireciona para login */}
+          {!isAuthenticated && <Route path="*" element={<Navigate to="/login" replace />} />}
 
-          {/* Protected Routes */}
-          {isAuthenticated ? (
-            <Route element={<MainLayout />}>
-              {' '}
-              {/* Apply layout to all authenticated routes */}
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/assets" element={<AssetList />} />
-              <Route path="/assets/new" element={<AssetForm />} />
-              <Route path="/assets/:id" element={<AssetForm />} />
-              <Route path="/assets/:assetId/maintenances" element={<MaintenanceList />} />
-              <Route path="/assets/:assetId/maintenances/new" element={<MaintenanceForm />} />
-              {/* Add other protected routes here */}
-              <Route path="*" element={<Navigate to="/" replace />} />{' '}
-              {/* Redirect unknown authenticated routes to landing */}
-            </Route>
-          ) : (
-            // Redirect to login if not authenticated and trying to access any other path
-            // The Login and Register routes are handled above and will show the MainLayout (Header/Footer)
-            // This catch-all ensures any other path attempt goes to login
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          )}
+          {/* Se autenticado e nenhuma rota acima bateu (e não é /login ou /register), redireciona para / */}
+          {isAuthenticated && <Route path="*" element={<Navigate to="/" replace />} />}
         </Routes>
       </Router>
     </ThemeProvider>

@@ -1,10 +1,11 @@
+// frontend/src/components/Login.tsx
 import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router';
+import type { FormEvent } from 'react'; // Mantendo seu import de tipo
+import { useNavigate, Link as RouterLink } from 'react-router'; // Assumindo react-router, se for 'react-router', avise
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
-import Link from '@mui/material/Link';
+import Link from '@mui/material/Link'; // MUI Link
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
@@ -30,7 +31,6 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
 
     try {
       const response = await fetch('/api/login', {
-        // 1. Endpoint correto?
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -38,18 +38,26 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
         body: JSON.stringify({ email, password }),
       });
 
-      // 2. Tratamento da Resposta
       if (!response.ok) {
-        // Tenta ler a mensagem de erro do backend
-        let errorMessage = 'Login failed. Please check your credentials.'; // Mensagem padrão
+        let errorMessage = 'Login failed. Please check your credentials.';
         try {
           const errorData = await response.json();
-          if (errorData && errorData.error) {
-            // Seu backend retorna { error: "mensagem" }
+          // Seu backend retorna { error: "mensagem" } ou pode ter { error: { error: "mensagem" } }
+          if (errorData && errorData.error && typeof errorData.error === 'string') {
             errorMessage = errorData.error;
+          } else if (
+            errorData &&
+            errorData.error &&
+            errorData.error.error &&
+            typeof errorData.error.error === 'string'
+          ) {
+            // Caso aninhado
+            errorMessage = errorData.error.error;
+          } else if (errorData && errorData.message) {
+            // Fallback para .message
+            errorMessage = errorData.message;
           }
         } catch (_e) {
-          // Se não conseguir parsear JSON, usa a mensagem padrão ou o statusText
           if (response.statusText) {
             errorMessage = response.statusText;
           }
@@ -57,24 +65,11 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
         throw new Error(errorMessage);
       }
 
-      // Se chegou aqui, response.ok é true. O backend deve ter configurado o cookie.
-      // O backend retorna { message: "OK" } no sucesso do login.
-      // Não precisamos do 'token' do corpo da resposta se o cookie é httpOnly.
-      // const data = await response.json(); // Não estritamente necessário se o backend só manda cookie
-      // e uma mensagem de sucesso.
-
-      // 3. Atualiza estado e navega
+      // Se chegou aqui, response.ok é true. O backend configurou o cookie httpOnly.
+      // Não precisamos manipular tokens no frontend.
       setIsAuthenticated(true);
-      // Disparar um evento para o App.tsx pegar (se ele ainda estiver usando essa lógica)
-      // pode não ser mais necessário se o App.tsx já escuta 'storage' ou
-      // se a navegação e o re-render já fazem o App.tsx reavaliar.
-      // Para simplificar, a chamada a setIsAuthenticated deve ser suficiente.
-      // window.dispatchEvent(new Event('tokenChanged')); // Pode ser opcional
-
-      // 5. Redirecionamento
-      navigate('/');
+      navigate('/'); // Redireciona para a página principal/dashboard
     } catch (err: unknown) {
-      // 6. Tratamento de Erros
       if (err instanceof Error) {
         setError(err.message);
       } else if (typeof err === 'string') {
@@ -87,7 +82,6 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
     }
   };
 
-  // ... (JSX do formulário continua o mesmo)
   return (
     <Container component="main" maxWidth="xs">
       <Box
@@ -145,11 +139,13 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
           >
             {loading ? 'Signing In...' : 'Sign In'}
           </Button>
+          {/* Mantendo sua estrutura de Grid para o link de registro */}
           <Grid container>
             <Grid size={{ xs: 12 }} sx={{ textAlign: 'right' }}>
               {' '}
-              {/* Ajustado para ocupar largura e alinhar */}
-              <Link href="/register" variant="body2">
+              {/* Usando 'size' como no seu original */}
+              {/* Para navegação com React Router, o Link do MUI deve usar o RouterLink como componente */}
+              <Link component={RouterLink} to="/register" variant="body2">
                 {"Don't have an account? Sign Up"}
               </Link>
             </Grid>
