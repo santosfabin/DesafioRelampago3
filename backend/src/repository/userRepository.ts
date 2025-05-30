@@ -103,6 +103,16 @@ const removeUserSql = async (id: number) => {
   }
 };
 
+const showOneUsersSql = async (id: number) => {
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    return result.rows;
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
+};
+
 // const showAllUsersSql = async () => {
 //   try {
 //     const result = await pool.query('SELECT * FROM users');
@@ -114,4 +124,4 @@ const removeUserSql = async (id: number) => {
 // };
 
 // module.exports = { createUserSql, updateUserSql, removeUserSql, showAllUsersSql };
-module.exports = { createUserSql, updateUserSql, removeUserSql };
+module.exports = { createUserSql, updateUserSql, showOneUsersSql, removeUserSql };

@@ -144,6 +144,30 @@ const removeUser = async (id: number) => {
   }
 };
 
+const showOneUsers = async (id: number) => {
+  try {
+    const result = await userRepository.showOneUsersSql(id);
+    if ('error' in result) {
+      return { error: result.error };
+    }
+
+    // Retira a senha de cada usuário, ou seja, não vai enviar
+    const usersWithoutPassword = result.map((user: any) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    }));
+
+    return { user: usersWithoutPassword };
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      throw new Error(error.message || 'Erro ao buscar usuários.');
+    } else {
+      throw new Error('Erro desconhecido ao buscar usuários.');
+    }
+  }
+};
+
 // const showAllUsers = async () => {
 //   try {
 //     const result = await userRepository.showAllUsersSql();
@@ -169,4 +193,4 @@ const removeUser = async (id: number) => {
 // };
 
 // module.exports = { createUser, updateUser, removeUser, showAllUsers };
-module.exports = { createUser, updateUser, removeUser };
+module.exports = { createUser, updateUser, showOneUsers, removeUser };
