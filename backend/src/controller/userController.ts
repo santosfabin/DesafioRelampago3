@@ -10,7 +10,6 @@ const createUser = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Dados insuficientes' });
     }
 
-    // Chama o service para validar e criar o usuário
     const result = await userService.createUser(name, email, password);
 
     if (result.error) {
@@ -109,22 +108,5 @@ const showOneUsers = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Erro ao remover usuário.' });
   }
 };
-
-// const showAllUsers = async (req: Request, res: Response) => {
-//   try {
-//     const result = await userService.showAllUsers();
-//     if (result.error) {
-//       return res.status(400).json({ error: result });
-//     }
-
-//     return res.status(200).json(result);
-//   } catch (error) {
-//     console.error(error);
-
-//     return res.status(400).json({ error: 'Erro ao buscar usuários.' });
-//   }
-// };
-
-// module.exports = { createUser, updateUser, removeUser, showAllUsers };
 
 module.exports = { createUser, updateUser, showOneUsers, removeUser };

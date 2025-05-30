@@ -29,9 +29,11 @@ const createUser = async (
     throw new Error(`Email inválido.`);
   }
 
- if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password)) { // .{8,} permite qualquer caractere
-  throw new Error('Senha inválida. Deve conter pelo menos uma letra, um número e no mínimo 8 caracteres.');
-}
+  if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password)) {
+    throw new Error(
+      'Senha inválida. Deve conter pelo menos uma letra, um número e no mínimo 8 caracteres.'
+    );
+  }
 
   const hashedPassword = await hashPassword(password);
 
@@ -58,12 +60,10 @@ const updateUser = async (id: number, updatedFields: any) => {
   try {
     const { name, email, password } = updatedFields;
 
-    // Verifica se ao menos um campo foi enviado
     if (!name && !email && !password) {
       throw new Error('Nenhum campo para atualizar');
     }
 
-    // Validações para o campo name
     if (
       name &&
       (typeof name !== 'string' || name.length < 4 || !/^[\p{L}0-9\s\-_]+$/u.test(name))
@@ -73,12 +73,10 @@ const updateUser = async (id: number, updatedFields: any) => {
       );
     }
 
-    // Validações para o campo email
     if (email && (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
       throw new Error('Email inválido.');
     }
 
-    // Validações para o campo password
     if (
       password &&
       (typeof password !== 'string' || !/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/.test(password))
@@ -88,7 +86,6 @@ const updateUser = async (id: number, updatedFields: any) => {
       );
     }
 
-    // Se a senha for fornecida, realiza o hash
     let hashedPassword: string | undefined;
     if (password) {
       hashedPassword = await hashPassword(password);
@@ -97,13 +94,11 @@ const updateUser = async (id: number, updatedFields: any) => {
       }
     }
 
-    // Atualiza apenas os campos válidos
     const fieldsToUpdate: any = {};
     if (name) fieldsToUpdate.name = name;
     if (email) fieldsToUpdate.email = email;
     if (password) fieldsToUpdate.password = hashedPassword;
 
-    // Chama o repositório para atualizar o usuário no banco de dados
     const result = await userRepository.updateUserSql(id, fieldsToUpdate);
 
     if ('error' in result) {
@@ -151,7 +146,6 @@ const showOneUsers = async (id: number) => {
       return { error: result.error };
     }
 
-    // Retira a senha de cada usuário, ou seja, não vai enviar
     const usersWithoutPassword = result.map((user: any) => ({
       id: user.id,
       name: user.name,
@@ -168,29 +162,4 @@ const showOneUsers = async (id: number) => {
   }
 };
 
-// const showAllUsers = async () => {
-//   try {
-//     const result = await userRepository.showAllUsersSql();
-//     if ('error' in result) {
-//       return { error: result.error };
-//     }
-
-//     // Retira a senha de cada usuário, ou seja, não vai enviar
-//     const usersWithoutPassword = result.map((user: any) => ({
-//       id: user.id,
-//       name: user.name,
-//       email: user.email,
-//     }));
-
-//     return { users: usersWithoutPassword };
-//   } catch (error: unknown) {
-//     if (error instanceof Error) {
-//       throw new Error(error.message || 'Erro ao buscar usuários.');
-//     } else {
-//       throw new Error('Erro desconhecido ao buscar usuários.');
-//     }
-//   }
-// };
-
-// module.exports = { createUser, updateUser, removeUser, showAllUsers };
 module.exports = { createUser, updateUser, showOneUsers, removeUser };

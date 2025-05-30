@@ -13,6 +13,5 @@ router.use(verifyActiveSession);
 router.put('/', userController.updateUser);
 router.delete('/', userController.removeUser);
 router.get("/", verifyActiveSession, userController.showOneUsers);
-// router.get("/", verifyActiveSession, userController.showAllUsers);
 
 module.exports = router;

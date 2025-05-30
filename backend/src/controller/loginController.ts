@@ -5,14 +5,12 @@ const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    // Verifica se os campos de email e senha estão vazios
     if (!email || !password) {
       return res.status(400).json({
         error: 'Preenchimento obrigatório dos campos de e-mail e senha',
       });
     }
 
-    // Regex para validar o formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Formato de e-mail inválido' });

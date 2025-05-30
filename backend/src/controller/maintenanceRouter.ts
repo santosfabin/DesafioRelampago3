@@ -5,34 +5,34 @@ import type { IMaintenance } from '../interfaces/maintenance';
 const maintenanceService = require('../services/maintenanceService');
 const validator = require('validator');
 
+const VALID_STATUSES = ['ativa', 'realizada', 'adiada', 'cancelada'];
+const VALID_USAGE_UNITS = ['km', 'horas', 'ciclos'];
+
 const showOneMaintenance = async (req: Request, res: Response) => {
   try {
     const token = req.cookies.session_id;
     if (!token) return res.status(401).json({ error: 'Token não fornecido' });
-
     const userId = getUserIdFromToken(token);
     if (!userId) return res.status(401).json({ error: 'Token inválido' });
-
     const assetId = req.params.id;
-
     if (!validator.isUUID(assetId)) {
-      return res.status(400).json({ error: 'ID inválido (esperado UUID)' });
+      return res.status(400).json({ error: 'ID do ativo inválido (esperado UUID)' });
     }
-
     const maintenanceId = req.params.maintenanceId;
-
     if (!validator.isUUID(maintenanceId)) {
-      return res.status(400).json({ error: 'ID inválido (esperado UUID)' });
+      return res.status(400).json({ error: 'ID da manutenção inválido (esperado UUID)' });
     }
-
     const result = await maintenanceService.showOneMaintenance(userId, assetId, maintenanceId);
-    if (result.error) {
-      return res.status(400).json({ error: result });
+    if (result.error || !result.maintenance || result.maintenance.length === 0) {
+      return res.status(404).json({ error: result.error || 'Manutenção não encontrada' });
     }
 
-    return res.status(200).json(result);
+    return res.status(200).json({ maintenance: result.maintenance[0] });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    console.error('Error in showOneMaintenance controller:', e.message, e.stack);
+    return res
+      .status(500)
+      .json({ error: 'Erro ao buscar detalhes da manutenção.', details: e.message });
   }
 };
 
@@ -40,24 +40,20 @@ const showAllMaintenance = async (req: Request, res: Response) => {
   try {
     const token = req.cookies.session_id;
     if (!token) return res.status(401).json({ error: 'Token não fornecido' });
-
     const userId = getUserIdFromToken(token);
     if (!userId) return res.status(401).json({ error: 'Token inválido' });
-
     const assetId = req.params.id;
-
     if (!validator.isUUID(assetId)) {
-      return res.status(400).json({ error: 'ID inválido (esperado UUID)' });
+      return res.status(400).json({ error: 'ID do ativo inválido (esperado UUID)' });
     }
-
     const result = await maintenanceService.showAllMaintenance(userId, assetId);
     if (result.error) {
-      return res.status(400).json({ error: result });
+      return res.status(400).json({ error: result.error });
     }
-
     return res.status(200).json(result);
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    console.error('Error in showAllMaintenance controller:', e.message, e.stack);
+    return res.status(500).json({ error: 'Erro ao listar manutenções.', details: e.message });
   }
 };
 
@@ -65,10 +61,8 @@ export const createMaintenance = async (req: Request, res: Response) => {
   try {
     const token = req.cookies.session_id;
     if (!token) return res.status(401).json({ error: 'Token não fornecido' });
-
     const userId = getUserIdFromToken(token);
     if (!userId) return res.status(401).json({ error: 'Token inválido' });
-
     const assetId = req.params.id;
     if (!validator.isUUID(assetId)) {
       return res.status(400).json({ error: 'ID do ativo inválido (esperado UUID)' });
@@ -78,138 +72,174 @@ export const createMaintenance = async (req: Request, res: Response) => {
       service,
       description,
       performed_at,
+      status,
       next_due_date,
       next_due_usage_limit,
       next_due_usage_current,
       usage_unit,
     }: IMaintenance = req.body;
 
-    if (!service) {
+    if (!service || service.trim() === '') {
       return res.status(400).json({ error: `Campo 'service' é obrigatório` });
     }
 
-    let hasDue = false;
+    const finalStatus = status && VALID_STATUSES.includes(status) ? status : 'ativa';
 
-    const maintenanceData: IMaintenance & { user_id: string; asset_id: string } = {
+    let hasDue = false;
+    const maintenanceData: Partial<IMaintenance> & {
+      user_id: string;
+      asset_id: string;
+      service: string;
+      status: string;
+    } = {
       user_id: userId,
       asset_id: assetId,
-      service,
-      description,
-      performed_at,
-      status: 'ativa',
+      service: service.trim(),
+      description: description,
+      performed_at: performed_at,
+      status: finalStatus,
+
+      next_due_date: undefined,
+      next_due_usage_limit: undefined,
+      next_due_usage_current: undefined,
+      usage_unit: undefined,
     };
 
-    // Prioriza previsão por data, ignora uso se os dois forem enviados
     if (next_due_date) {
       hasDue = true;
       maintenanceData.next_due_date = next_due_date;
+      maintenanceData.next_due_usage_limit = null;
+      maintenanceData.next_due_usage_current = null;
+      maintenanceData.usage_unit = null;
     } else if (
       next_due_usage_limit !== undefined &&
+      next_due_usage_limit !== null &&
       next_due_usage_current !== undefined &&
-      ['km', 'horas', 'ciclos'].includes(usage_unit || '')
+      next_due_usage_current !== null &&
+      usage_unit &&
+      VALID_USAGE_UNITS.includes(usage_unit)
     ) {
       hasDue = true;
-      maintenanceData.next_due_usage_limit = next_due_usage_limit;
-      maintenanceData.next_due_usage_current = next_due_usage_current;
+      maintenanceData.next_due_usage_limit = Number(next_due_usage_limit);
+      maintenanceData.next_due_usage_current = Number(next_due_usage_current);
       maintenanceData.usage_unit = usage_unit;
+      maintenanceData.next_due_date = null;
     }
 
-    if (!hasDue) {
-      return res.status(400).json({ error: 'É necessário informar previsão por data ou por uso' });
+    if (finalStatus === 'ativa' && !hasDue) {
+      return res.status(400).json({
+        error:
+          'Para status "ativa", é necessário informar previsão por data ou por uso completo (limite, atual, unidade)',
+      });
     }
 
-    const created = await maintenanceService.createMaintenance(maintenanceData);
+    const created = await maintenanceService.createMaintenance(
+      maintenanceData as IMaintenance & { user_id: string; asset_id: string }
+    );
 
-    if (created.error) {
-      return res.status(500).json({ error: created.error });
+    if (created.error || !created.mainenance || created.mainenance.length === 0) {
+      return res.status(500).json({ error: created.error || 'Falha ao criar manutenção' });
     }
 
-    return res.status(200).json(created);
+    return res.status(201).json({ maintenance: created.mainenance[0] });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    console.error('Error in createMaintenance controller:', e.message, e.stack);
+    return res.status(500).json({ error: 'Erro interno ao criar manutenção.', details: e.message });
   }
 };
 
-// Em backend/src/controller/maintenanceRouter.ts -> updateMaintenance
 export const updateMaintenance = async (req: Request, res: Response) => {
   try {
     const token = req.cookies.session_id;
     if (!token) return res.status(401).json({ error: 'Token não fornecido' });
-
-    const userId = getUserIdFromToken(token); // Assumindo que retorna number para seu repositório
+    const userId = getUserIdFromToken(token);
     if (!userId) return res.status(401).json({ error: 'Token inválido' });
-
     const assetId = req.params.id;
     const maintenanceId = req.params.maintenanceId;
 
-    if (!validator.isUUID(assetId)) {
+    if (!validator.isUUID(assetId))
       return res.status(400).json({ error: 'ID do ativo inválido (esperado UUID)' });
-    }
-    if (!validator.isUUID(maintenanceId)) {
+    if (!validator.isUUID(maintenanceId))
       return res.status(400).json({ error: 'ID da manutenção inválido (esperado UUID)' });
-    }
 
-    // Pega todos os campos permitidos do body.
-    // A interface IMaintenance deve definir todos os campos possíveis.
     const {
       service,
       description,
-      performed_at, // Adicionado performed_at
+      performed_at,
       next_due_date,
       next_due_usage_limit,
       next_due_usage_current,
       usage_unit,
       status,
-    }: Partial<IMaintenance> = req.body; // Use a interface IMaintenance do seu backend
+    }: Partial<IMaintenance> = req.body;
 
-    // Cria um objeto apenas com os campos que foram realmente enviados na requisição.
-    // O repositório lidará com a lógica de zerar os campos opostos.
-    const fieldsToUpdate: Partial<IMaintenance> = {}; // Use IMaintenance ou IMaintenanceUpdate aqui
+    const fieldsToUpdate: Partial<IMaintenance> = {};
 
-    if ('service' in req.body) fieldsToUpdate.service = service;
-    if ('description' in req.body) fieldsToUpdate.description = description; // Permite null ou string vazia
-    if ('performed_at' in req.body) fieldsToUpdate.performed_at = performed_at; // Permite null ou data
-    if (
-      'status' in req.body &&
-      status &&
-      ['ativa', 'realizada', 'adiada', 'cancelada'].includes(status)
-    ) {
-      fieldsToUpdate.status = status;
+    if ('service' in req.body) {
+      if (typeof service === 'string' && service.trim() !== '') {
+        fieldsToUpdate.service = service.trim();
+      } else if (service === null || service === '') {
+        return res.status(400).json({ error: 'Campo "service" não pode ser vazio.' });
+      }
     }
-    if ('next_due_date' in req.body) fieldsToUpdate.next_due_date = next_due_date; // Passa null se enviado como null
-    if ('next_due_usage_limit' in req.body)
-      fieldsToUpdate.next_due_usage_limit = next_due_usage_limit;
-    if ('next_due_usage_current' in req.body)
-      fieldsToUpdate.next_due_usage_current = next_due_usage_current;
-    if ('usage_unit' in req.body) fieldsToUpdate.usage_unit = usage_unit;
+    if ('description' in req.body) fieldsToUpdate.description = description;
+    if ('performed_at' in req.body) fieldsToUpdate.performed_at = performed_at;
+
+    if ('status' in req.body) {
+      if (status && VALID_STATUSES.includes(status)) {
+        fieldsToUpdate.status = status;
+      } else if (status) {
+        return res.status(400).json({
+          error: `Status inválido: ${status}. Valores permitidos: ${VALID_STATUSES.join(', ')}`,
+        });
+      }
+    }
+
+    if ('next_due_date' in req.body) fieldsToUpdate.next_due_date = next_due_date;
+
+    if ('next_due_usage_limit' in req.body) {
+      fieldsToUpdate.next_due_usage_limit =
+        next_due_usage_limit === null || next_due_usage_limit === undefined
+          ? null
+          : Number(next_due_usage_limit);
+    }
+    if ('next_due_usage_current' in req.body) {
+      fieldsToUpdate.next_due_usage_current =
+        next_due_usage_current === null || next_due_usage_current === undefined
+          ? null
+          : Number(next_due_usage_current);
+    }
+    if ('usage_unit' in req.body) {
+      if (usage_unit && !VALID_USAGE_UNITS.includes(usage_unit)) {
+        return res.status(400).json({
+          error: `Unidade de uso inválida: ${usage_unit}. Valores permitidos: ${VALID_USAGE_UNITS.join(
+            ', '
+          )}`,
+        });
+      }
+      fieldsToUpdate.usage_unit = usage_unit;
+    }
 
     if (Object.keys(fieldsToUpdate).length === 0) {
       return res.status(400).json({ error: 'Nenhum campo válido foi enviado para atualização' });
     }
 
-    // Chama o serviço, que chamará o repositório
     const result = await maintenanceService.updateMaintenance(
-      userId, // Certifique-se que o tipo de userId aqui corresponde ao esperado pelo serviço/repositório
+      userId,
       assetId,
       maintenanceId,
-      fieldsToUpdate // Passa apenas os campos que vieram na requisição
+      fieldsToUpdate
     );
 
-    // O tipo de 'result' pode ser um array de rows ou um objeto de erro
-    if ((result as any).error || (Array.isArray(result) && result.length === 0)) {
-      // Se o serviço/repositório retornar um objeto com a propriedade 'error', ou um array vazio (indicando falha)
-      const errorMessage =
-        (result as any).error || 'Falha ao atualizar manutenção ou manutenção não encontrada.';
-      return res.status(400).json({ error: errorMessage });
+    if (result.error || !result.maintenance || result.maintenance.length === 0) {
+      return res.status(400).json({
+        error: result.error || 'Falha ao atualizar manutenção ou manutenção não encontrada.',
+      });
     }
 
-    // Se o resultado for um array e tiver pelo menos um item, pegue o primeiro
-    const updatedMaintenance = Array.isArray(result) ? result[0] : result;
-
-    return res.status(200).json(updatedMaintenance); // Retorna a manutenção atualizada
+    return res.status(200).json({ maintenance: result.maintenance[0] });
   } catch (e: any) {
-    // Log do erro no servidor para depuração
-    console.error('Erro no controller updateMaintenance:', e.message, e.stack);
+    console.error('Error in updateMaintenance controller:', e.message, e.stack);
     return res
       .status(500)
       .json({ error: 'Erro interno do servidor ao atualizar manutenção.', details: e.message });
@@ -220,30 +250,26 @@ const removeMaintenance = async (req: Request, res: Response) => {
   try {
     const token = req.cookies.session_id;
     if (!token) return res.status(401).json({ error: 'Token não fornecido' });
-
     const userId = getUserIdFromToken(token);
     if (!userId) return res.status(401).json({ error: 'Token inválido' });
-
     const assetId = req.params.id;
-
     if (!validator.isUUID(assetId)) {
-      return res.status(400).json({ error: 'ID inválido (esperado UUID)' });
+      return res.status(400).json({ error: 'ID do ativo inválido (esperado UUID)' });
     }
-
     const maintenanceId = req.params.maintenanceId;
-
     if (!validator.isUUID(maintenanceId)) {
-      return res.status(400).json({ error: 'ID inválido (esperado UUID)' });
+      return res.status(400).json({ error: 'ID da manutenção inválido (esperado UUID)' });
     }
 
     const result = await maintenanceService.removeMaintenance(userId, assetId, maintenanceId);
     if (result.error) {
-      return res.status(400).json({ error: result });
+      return res.status(400).json({ error: result.error });
     }
 
     return res.status(200).json(result);
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    console.error('Error in removeMaintenance controller:', e.message, e.stack);
+    return res.status(500).json({ error: 'Erro ao remover manutenção.', details: e.message });
   }
 };
 

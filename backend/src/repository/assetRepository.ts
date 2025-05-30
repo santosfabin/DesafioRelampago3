@@ -59,10 +59,8 @@ const updateAssetSql = async (
       values.push(key === 'importance' ? Number(value) : value);
     }
 
-    // Adiciona updated_at
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
 
-    // Adiciona user_id e id como última condição
     values.push(userId, itemId);
 
     const query = `

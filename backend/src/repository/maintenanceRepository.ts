@@ -43,7 +43,6 @@ const createMaintenanceSql = async (
   maintenanceData: IMaintenance & { user_id: string; asset_id: string }
 ) => {
   try {
-    // 1. Verifica se o asset pertence ao user
     const verifyQuery = `SELECT 1 FROM asset WHERE id = $1 AND user_id = $2`;
     const verifyResult = await pool.query(verifyQuery, [
       maintenanceData.asset_id,
@@ -54,7 +53,6 @@ const createMaintenanceSql = async (
       throw new Error('Ativo não encontrado');
     }
 
-    // 2. Se for dono, insere normalmente
     const insertQuery = `
       INSERT INTO maintenance (
         asset_id, service, description, performed_at, status,
@@ -84,103 +82,173 @@ const createMaintenanceSql = async (
   }
 };
 
+const UPDATABLE_MAINTENANCE_KEYS: (keyof IMaintenanceUpdate)[] = [
+  'service',
+  'description',
+  'performed_at',
+  'status',
+  'next_due_date',
+  'next_due_usage_limit',
+  'next_due_usage_current',
+  'usage_unit',
+];
+
 const updateMaintenanceSql = async (
-  userId: number,
+  userId: string,
   assetId: string,
   maintenanceId: string,
-  updateData: Partial<IMaintenanceUpdate>
+  updateDataFromService: Partial<IMaintenanceUpdate>
 ) => {
   try {
-    // 1. Verifica se o ativo pertence ao usuário
     const verifyQuery = `SELECT 1 FROM asset WHERE id = $1 AND user_id = $2`;
     const verifyResult = await pool.query(verifyQuery, [assetId, userId]);
     if (verifyResult.rowCount === 0) {
       throw new Error('Ativo não encontrado ou não pertence ao usuário');
     }
 
-    // 2. Campos de uso para controle
-    const usageFields: (keyof IMaintenanceUpdate)[] = [
-      'next_due_usage_limit',
-      'next_due_usage_current',
-      'usage_unit',
-    ];
-
-    // 3. Busca os dados atuais para mesclar
     const existingQuery = `
-      SELECT next_due_date, next_due_usage_limit, next_due_usage_current, usage_unit 
+      SELECT service, description, performed_at, status, 
+      next_due_date, next_due_usage_limit, next_due_usage_current, usage_unit
       FROM maintenance 
       WHERE id = $1 AND asset_id = $2
     `;
     const existingResult = await pool.query(existingQuery, [maintenanceId, assetId]);
     if (existingResult.rowCount === 0) {
-      throw new Error('Manutenção não encontrada para leitura dos dados existentes');
+      throw new Error('Manutenção não encontrada para atualização');
     }
-    const existing = existingResult.rows[0] as IMaintenanceUpdate;
+    const existingMaintenanceData = existingResult.rows[0] as IMaintenance;
 
-    // 4. Começa mesclando dados atuais com os novos
-    const dataToUpdate: Partial<Record<keyof IMaintenanceUpdate, string | number | null>> = {
-      ...existing,
-      ...updateData,
-    };
+    const finalSqlPayload: Partial<IMaintenance> = { ...updateDataFromService };
 
-    const sentDate = updateData.next_due_date;
-    const sentUsageFields = usageFields.some(f => f in updateData);
+    if ('next_due_date' in updateDataFromService) {
+      finalSqlPayload.next_due_date = updateDataFromService.next_due_date;
+      finalSqlPayload.next_due_usage_limit = null;
+      finalSqlPayload.next_due_usage_current = null;
+      finalSqlPayload.usage_unit = null;
+    } else if (
+      'next_due_usage_limit' in updateDataFromService ||
+      'next_due_usage_current' in updateDataFromService ||
+      'usage_unit' in updateDataFromService
+    ) {
+      finalSqlPayload.next_due_date = null;
 
-    // 5. Regras para exclusividade entre data e uso
-    if (sentDate !== undefined && sentDate !== null) {
-      // Se enviou previsão por data (não nulo)
-      // Mantém next_due_date, zera todos os campos de uso
-      for (const f of usageFields) {
-        dataToUpdate[f] = null;
+      finalSqlPayload.next_due_usage_limit =
+        updateDataFromService.next_due_usage_limit !== undefined
+          ? updateDataFromService.next_due_usage_limit
+          : existingMaintenanceData.next_due_usage_limit;
+      finalSqlPayload.next_due_usage_current =
+        updateDataFromService.next_due_usage_current !== undefined
+          ? updateDataFromService.next_due_usage_current
+          : existingMaintenanceData.next_due_usage_current;
+      finalSqlPayload.usage_unit =
+        updateDataFromService.usage_unit !== undefined
+          ? updateDataFromService.usage_unit
+          : existingMaintenanceData.usage_unit;
+
+      const { next_due_usage_limit, next_due_usage_current, usage_unit } = finalSqlPayload;
+      const usageValuesProvided = [next_due_usage_limit, next_due_usage_current, usage_unit];
+      const numUsageValuesEffectivelySet = usageValuesProvided.filter(
+        v => v !== null && v !== undefined
+      ).length;
+
+      if (numUsageValuesEffectivelySet > 0 && numUsageValuesEffectivelySet < 3) {
+        throw new Error(
+          'Para previsão por uso, todos os campos (limit, current, unit) devem ser fornecidos juntos, ou todos devem ser nulos para limpar a previsão por uso.'
+        );
+      } else if (
+        numUsageValuesEffectivelySet === 0 &&
+        ('next_due_usage_limit' in updateDataFromService ||
+          'next_due_usage_current' in updateDataFromService ||
+          'usage_unit' in updateDataFromService)
+      ) {
+        finalSqlPayload.next_due_usage_limit = null;
+        finalSqlPayload.next_due_usage_current = null;
+        finalSqlPayload.usage_unit = null;
       }
-    } else if (sentUsageFields) {
-      // Se enviou algum campo de uso
-      // Zera a data
-      dataToUpdate.next_due_date = null;
+    }
 
-      // Para cada campo de uso:
-      for (const f of usageFields) {
-        if (updateData[f] === undefined) {
-          // Se campo não veio no update, mantém o valor antigo (existente)
-          dataToUpdate[f] = existing[f] ?? null;
+    const fieldsForUpdateQuery: any = {};
+    let hasActualChanges = false;
+
+    for (const key of UPDATABLE_MAINTENANCE_KEYS) {
+      const isPredictionField = [
+        'next_due_date',
+        'next_due_usage_limit',
+        'next_due_usage_current',
+        'usage_unit',
+      ].includes(key);
+
+      if (key in finalSqlPayload) {
+        if (finalSqlPayload[key] !== undefined) {
+          if (isPredictionField || finalSqlPayload[key] !== existingMaintenanceData[key]) {
+            fieldsForUpdateQuery[key] = finalSqlPayload[key];
+            if (finalSqlPayload[key] !== existingMaintenanceData[key]) {
+              hasActualChanges = true;
+            } else if (
+              isPredictionField &&
+              finalSqlPayload[key] === null &&
+              existingMaintenanceData[key] !== null
+            ) {
+              hasActualChanges = true;
+            } else if (
+              isPredictionField &&
+              finalSqlPayload[key] !== null &&
+              existingMaintenanceData[key] === null
+            ) {
+              hasActualChanges = true;
+            }
+          }
         }
       }
     }
 
-    // 6. Remove chaves undefined (não atualiza campos não passados)
-    for (const k in dataToUpdate) {
-      if (dataToUpdate[k as keyof IMaintenanceUpdate] === undefined) {
-        delete dataToUpdate[k as keyof IMaintenanceUpdate];
+    if (!hasActualChanges && Object.keys(fieldsForUpdateQuery).length > 0) {
+      const changedPredictionType =
+        ('next_due_date' in fieldsForUpdateQuery &&
+          existingMaintenanceData.next_due_usage_limit !== null) ||
+        (('next_due_usage_limit' in fieldsForUpdateQuery ||
+          'next_due_usage_current' in fieldsForUpdateQuery ||
+          'usage_unit' in fieldsForUpdateQuery) &&
+          existingMaintenanceData.next_due_date !== null);
+      if (!changedPredictionType) {
+        hasActualChanges = false;
+      } else {
+        hasActualChanges = true;
       }
     }
 
-    // 7. Garante que existe algo para atualizar
-    const keys = Object.keys(dataToUpdate);
-    if (keys.length === 0) {
-      throw new Error('Nenhum campo válido para atualizar');
+    const keysToQuery = Object.keys(fieldsForUpdateQuery);
+
+    if (keysToQuery.length === 0 || !hasActualChanges) {
+      console.warn(
+        'Nenhum campo efetivamente alterado para a manutenção ID:',
+        maintenanceId,
+        ' Retornando dados existentes.'
+      );
+      return [existingMaintenanceData];
     }
 
-    // 8. Monta query UPDATE dinâmico
-    const setClauses = keys.map((key, i) => `${key} = $${i + 1}`);
-    const values = keys.map(key => (dataToUpdate as any)[key]);
+    const setClauses = keysToQuery.map((k, i) => `"${k}" = $${i + 1}`);
+    const values = keysToQuery.map(k_string => fieldsForUpdateQuery[k_string]);
 
     const updateQuery = `
       UPDATE maintenance
       SET ${setClauses.join(', ')}
-      WHERE id = $${keys.length + 1} AND asset_id = $${keys.length + 2}
+      WHERE id = $${keysToQuery.length + 1} AND asset_id = $${keysToQuery.length + 2}
       RETURNING *;
     `;
 
-    // 9. Executa update
     const result = await pool.query(updateQuery, [...values, maintenanceId, assetId]);
 
     if (result.rowCount === 0) {
-      throw new Error('Manutenção não encontrada ou não atualizada');
+      throw new Error(
+        'Manutenção não encontrada durante o UPDATE ou nenhuma linha foi efetivamente atualizada (rowCount 0).'
+      );
     }
-
     return result.rows;
   } catch (error: any) {
-    throw new Error(error.message);
+    console.error('Erro no updateMaintenanceSql:', error.message, error.stack);
+    throw error;
   }
 };
 

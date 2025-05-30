@@ -98,7 +98,6 @@ const updateAsset = async (req: Request, res: Response) => {
 
     const updateContent: { name?: string; description?: string; importance?: string } = req.body;
 
-    // Remove campos que estão como string vazia ou importance inválido
     for (const key in updateContent) {
       if (
         updateContent[key as keyof typeof updateContent] === '' ||

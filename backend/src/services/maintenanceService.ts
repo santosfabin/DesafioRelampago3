@@ -59,14 +59,12 @@ const createMaintenance = async (
   return { mainenance: result };
 };
 
-// Função para limpar dados inválidos, remover "" e null indevidos, etc
 function cleanUpdateData(updateData: Partial<IMaintenanceUpdate>): Partial<IMaintenanceUpdate> {
   const usageUnits: UsageUnit[] = ['km', 'horas', 'ciclos'];
   const validStatuses = ['ativa', 'realizada', 'adiada', 'cancelada'];
 
   const cleaned: Partial<IMaintenanceUpdate> = {};
 
-  // Corrige descrição
   if ('description' in updateData) {
     if (updateData.description === null) {
       delete cleaned.description;
@@ -78,12 +76,10 @@ function cleanUpdateData(updateData: Partial<IMaintenanceUpdate>): Partial<IMain
     }
   }
 
-  // Corrige status
   if ('status' in updateData && validStatuses.includes(updateData.status!)) {
     cleaned.status = updateData.status!;
   }
 
-  // Corrige service
   if ('service' in updateData && typeof updateData.service === 'string') {
     const svc = updateData.service.trim();
     if (svc !== '') {
@@ -91,24 +87,27 @@ function cleanUpdateData(updateData: Partial<IMaintenanceUpdate>): Partial<IMain
     }
   }
 
-  // -------------------------
-  // PREVISÃO POR DATA
-  // -------------------------
+  if ('performed_at' in updateData) {
+    if (
+      updateData.performed_at === null ||
+      (typeof updateData.performed_at === 'string' && updateData.performed_at.trim() !== '')
+    ) {
+      cleaned.performed_at = updateData.performed_at;
+    }
+  }
+
   const hasValidDate =
     typeof updateData.next_due_date === 'string' && updateData.next_due_date.trim() !== '';
 
   if (hasValidDate) {
     cleaned.next_due_date = updateData.next_due_date!.trim();
-    // remove todos os de uso
+
     delete cleaned.next_due_usage_limit;
     delete cleaned.next_due_usage_current;
     delete cleaned.usage_unit;
     return cleaned;
   }
 
-  // -------------------------
-  // PREVISÃO POR USO
-  // -------------------------
   const hasUsageLimit =
     typeof updateData.next_due_usage_limit === 'number' && updateData.next_due_usage_limit >= 0;
 
@@ -118,9 +117,8 @@ function cleanUpdateData(updateData: Partial<IMaintenanceUpdate>): Partial<IMain
   const hasUsageUnit =
     typeof updateData.usage_unit === 'string' && usageUnits.includes(updateData.usage_unit);
 
-  // Se algum dos 3 foi enviado corretamente, limpa os outros e aceita só os válidos
   if (hasUsageLimit || hasUsageCurrent || hasUsageUnit) {
-    delete cleaned.next_due_date; // limpa o grupo da data
+    delete cleaned.next_due_date;
 
     if (hasUsageLimit) {
       cleaned.next_due_usage_limit = updateData.next_due_usage_limit!;
@@ -143,9 +141,6 @@ function cleanUpdateData(updateData: Partial<IMaintenanceUpdate>): Partial<IMain
     return cleaned;
   }
 
-  // -------------------------
-  // Se chegou aqui: previsão inválida, limpa tudo
-  // -------------------------
   delete cleaned.next_due_date;
   delete cleaned.next_due_usage_limit;
   delete cleaned.next_due_usage_current;
