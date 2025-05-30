@@ -5,7 +5,7 @@ import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Grid from '@mui/material/Grid'; // MUI Grid
+import Grid from '@mui/material/Grid';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardActions from '@mui/material/CardActions';
@@ -23,12 +23,78 @@ interface Asset {
   importance: number;
 }
 
+interface Maintenance {
+  id: string;
+  asset_id: string;
+  service: string;
+  description?: string | null;
+  performed_at?: string | null;
+  status: string;
+  next_due_date?: string | null;
+  next_due_usage_limit?: number | null;
+  next_due_usage_current?: number | null;
+  usage_unit?: string | null;
+  _nextDueDisplay?: string;
+}
+
+interface UrgentMaintenanceItem extends Maintenance {
+  assetName: string;
+  assetImportance: number;
+  urgencyScore: number;
+  urgencyText: string;
+  dueDisplay: string;
+}
+
 const NUMBER_OF_IMPORTANT_ASSETS_TO_SHOW = 5;
+const NUMBER_OF_URGENT_MAINTENANCES_TO_SHOW = 10;
+
+const getImportanceLabelAndColor = (
+  importance: number
+): { label: string; color: 'error' | 'warning' | 'info' | 'success' | 'default' } => {
+  switch (importance) {
+    case 5:
+      return { label: 'Very High', color: 'error' };
+    case 4:
+      return { label: 'High', color: 'warning' };
+    case 3:
+      return { label: 'Medium', color: 'info' };
+    case 2:
+      return { label: 'Low', color: 'success' };
+    case 1:
+      return { label: 'Very Low', color: 'default' };
+    default:
+      return { label: 'Unknown', color: 'default' };
+  }
+};
+
+const formatNextDueForDisplay = (maint: Maintenance): string => {
+  if (maint.next_due_date) {
+    try {
+      return new Date(maint.next_due_date).toLocaleDateString();
+    } catch (e) {
+      return 'Data Inválida';
+    }
+  }
+  if (maint.next_due_usage_limit !== null && maint.next_due_usage_limit !== undefined) {
+    const unitDisplay = maint.usage_unit
+      ? maint.usage_unit.charAt(0).toUpperCase() + maint.usage_unit.slice(1)
+      : '';
+    return `${maint.next_due_usage_current || 0}/${
+      maint.next_due_usage_limit
+    } ${unitDisplay}`.trim();
+  }
+  return 'N/A';
+};
 
 const LandingPage = () => {
   const [allAssets, setAllAssets] = useState<Asset[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(true);
   const [assetError, setAssetError] = useState<string | null>(null);
+
+  const [upcomingMaintenances, setUpcomingMaintenances] = useState<UrgentMaintenanceItem[]>([]);
+  const [loadingMaintenances, setLoadingMaintenances] = useState(true);
+  const [maintenancePanelError, setMaintenancePanelError] = useState<string | null>(null);
+
   const navigate = useNavigate();
   const theme = useTheme();
 
@@ -42,7 +108,7 @@ const LandingPage = () => {
           navigate('/login');
           return;
         }
-        let errorMsg = 'Failed to fetch assets for dashboard';
+        let errorMsg = 'Failed to fetch assets';
         try {
           const data = await response.json();
           if (data && data.error) errorMsg = data.error;
@@ -82,27 +148,165 @@ const LandingPage = () => {
       .slice(0, NUMBER_OF_IMPORTANT_ASSETS_TO_SHOW);
   }, [allAssets]);
 
-  const getImportanceLabelAndColor = (
-    importance: number
-  ): { label: string; color: 'error' | 'warning' | 'info' | 'success' | 'default' } => {
-    switch (importance) {
-      case 5:
-        return { label: 'Very High', color: 'error' };
-      case 4:
-        return { label: 'High', color: 'warning' };
-      case 3:
-        return { label: 'Medium', color: 'info' };
-      case 2:
-        return { label: 'Low', color: 'success' };
-      case 1:
-        return { label: 'Very Low', color: 'default' };
-      default:
-        return { label: 'Unknown', color: 'default' };
+  const fetchAndProcessMaintenances = useCallback(
+    async (assets: Asset[]) => {
+      if (!assets || assets.length === 0) {
+        setUpcomingMaintenances([]);
+        setLoadingMaintenances(false);
+        return;
+      }
+      setLoadingMaintenances(true);
+      setMaintenancePanelError(null);
+      const allPendingMaintenances: UrgentMaintenanceItem[] = [];
+
+      try {
+        const maintenancePromises = assets.map(asset =>
+          fetch(`/api/assets/${asset.id}/maintenances`)
+            .then(res => {
+              if (!res.ok) {
+                console.warn(
+                  `Failed to fetch maintenances for asset ${asset.id}, status: ${res.status}`
+                );
+                return { asset, maintenancesData: null };
+              }
+              return res.json().then(data => ({ asset, maintenancesData: data }));
+            })
+            .catch(err => {
+              console.error(`Error fetching maintenances for asset ${asset.id}:`, err);
+              return { asset, maintenancesData: null };
+            })
+        );
+
+        const results = await Promise.all(maintenancePromises);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        results.forEach(result => {
+          const { asset, maintenancesData } = result;
+          let maintenancesForAsset: Maintenance[] = [];
+
+          if (
+            maintenancesData &&
+            typeof maintenancesData === 'object' &&
+            maintenancesData !== null
+          ) {
+            const keyHoldingTheArray = 'maintenance';
+
+            if (
+              keyHoldingTheArray in maintenancesData &&
+              Array.isArray((maintenancesData as Record<string, unknown>)[keyHoldingTheArray])
+            ) {
+              maintenancesForAsset = (maintenancesData as Record<string, Maintenance[]>)[
+                keyHoldingTheArray
+              ];
+            } else if (Array.isArray(maintenancesData)) {
+              maintenancesForAsset = maintenancesData as Maintenance[];
+            } else {
+              console.warn(
+                `Expected '${keyHoldingTheArray}' to be an array in maintenancesData for asset ${asset.id}:`,
+                maintenancesData
+              );
+            }
+          } else if (maintenancesData === null) {
+            //
+          } else if (maintenancesData) {
+            console.warn(
+              `Unexpected type for maintenancesData for asset ${asset.id}:`,
+              maintenancesData
+            );
+          }
+
+          maintenancesForAsset.forEach(maint => {
+            if (maint.status !== 'ativa') {
+              return;
+            }
+
+            let urgencyScore = Infinity;
+            let urgencyText = '';
+            const dueDisplay = formatNextDueForDisplay(maint);
+            if (maint.next_due_date) {
+              const dueDate = new Date(maint.next_due_date);
+              dueDate.setHours(0, 0, 0, 0);
+              const diffTime = dueDate.getTime() - today.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              urgencyScore = diffDays;
+              if (diffDays < 0) urgencyText = `Atrasada (${Math.abs(diffDays)}d)`;
+              else if (diffDays === 0) urgencyText = 'Hoje!';
+              else if (diffDays === 1) urgencyText = 'Amanhã';
+              else if (diffDays <= 7) urgencyText = `Em ${diffDays} dias`;
+              else urgencyText = `Vence em ${diffDays} dias`;
+            } else if (
+              maint.next_due_usage_limit &&
+              maint.next_due_usage_current !== null &&
+              maint.next_due_usage_current !== undefined
+            ) {
+              const limit = maint.next_due_usage_limit;
+              const current = maint.next_due_usage_current;
+              const remaining = limit - current;
+              const percentage = limit > 0 ? (current / limit) * 100 : 0;
+              const unit = maint.usage_unit
+                ? maint.usage_unit.charAt(0).toUpperCase() + maint.usage_unit.slice(1)
+                : '';
+              if (remaining <= 0) {
+                urgencyScore = -1000 - Math.abs(remaining);
+                urgencyText = `Uso Excedido! (${Math.abs(remaining)} ${unit} além)`;
+              } else if (percentage >= 95) {
+                urgencyScore = -500 + remaining;
+                urgencyText = `Próximo (${remaining} ${unit} rest.) - ${percentage.toFixed(0)}%`;
+              } else if (percentage >= 80) {
+                urgencyScore = -200 + remaining;
+                urgencyText = `Atenção (${remaining} ${unit} rest.) - ${percentage.toFixed(0)}%`;
+              } else {
+                urgencyScore = remaining + 10000;
+                urgencyText = `Ok (${remaining} ${unit} rest.) - ${percentage.toFixed(0)}%`;
+              }
+            } else {
+              return;
+            }
+
+            allPendingMaintenances.push({
+              ...maint,
+              assetName: asset.name,
+              assetImportance: asset.importance,
+              urgencyScore,
+              urgencyText,
+              dueDisplay,
+            });
+          });
+        });
+        allPendingMaintenances.sort((a, b) => {
+          if (a.urgencyScore !== b.urgencyScore) return a.urgencyScore - b.urgencyScore;
+          return b.assetImportance - a.assetImportance;
+        });
+        setUpcomingMaintenances(
+          allPendingMaintenances.slice(0, NUMBER_OF_URGENT_MAINTENANCES_TO_SHOW)
+        );
+      } catch (err: unknown) {
+        console.error('Error processing maintenances for dashboard:', err);
+        if (err instanceof Error) setMaintenancePanelError(err.message);
+        else
+          setMaintenancePanelError(
+            'An unexpected error occurred while preparing upcoming maintenances.'
+          );
+      } finally {
+        setLoadingMaintenances(false);
+      }
+    },
+    [navigate]
+  );
+
+  useEffect(() => {
+    if (allAssets.length > 0 && !loadingAssets) {
+      fetchAndProcessMaintenances(allAssets);
+    } else if (!loadingAssets && allAssets.length === 0) {
+      setUpcomingMaintenances([]);
+      setLoadingMaintenances(false);
     }
-  };
+  }, [allAssets, loadingAssets, fetchAndProcessMaintenances]);
 
   return (
     <Container maxWidth="lg" sx={{ mt: 2, mb: 4 }}>
+      {/* Seção de Boas Vindas */}
       <Paper elevation={3} sx={{ p: { xs: 2, md: 4 }, mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom align="center">
           Welcome to AssetManager
@@ -120,6 +324,7 @@ const LandingPage = () => {
         </Box>
       </Paper>
 
+      {/* Painel de Ativos Importantes */}
       <Box sx={{ mb: 4 }}>
         <Typography
           variant="h4"
@@ -161,7 +366,6 @@ const LandingPage = () => {
         )}
         {!loadingAssets && !assetError && importantAssets.length > 0 && (
           <Grid container spacing={3}>
-            {' '}
             {importantAssets.map(asset => {
               const importanceStyle = getImportanceLabelAndColor(asset.importance);
               return (
@@ -233,6 +437,114 @@ const LandingPage = () => {
                 </Grid>
               );
             })}
+          </Grid>
+        )}
+      </Box>
+
+      {/* Painel de Manutenções Próximas/Urgentes */}
+      <Box sx={{ mt: 4 }}>
+        <Typography
+          variant="h4"
+          component="h2"
+          gutterBottom
+          sx={{ textAlign: { xs: 'center', md: 'left' } }}
+        >
+          Upcoming & Urgent Maintenances
+        </Typography>
+        {loadingMaintenances && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <CircularProgress />
+          </Box>
+        )}
+        {maintenancePanelError && (
+          <Alert severity="error" sx={{ mt: 2 }} onClose={() => setMaintenancePanelError(null)}>
+            {maintenancePanelError}
+          </Alert>
+        )}
+        {!loadingMaintenances &&
+          !maintenancePanelError &&
+          upcomingMaintenances.length === 0 &&
+          allAssets.length > 0 && (
+            <Typography variant="subtitle1" sx={{ mt: 2, textAlign: 'center' }}>
+              No upcoming maintenances needing immediate attention, or no active maintenances with
+              predictions found.
+            </Typography>
+          )}
+        {!loadingMaintenances &&
+          !maintenancePanelError &&
+          upcomingMaintenances.length === 0 &&
+          allAssets.length === 0 &&
+          !loadingAssets && (
+            <Typography variant="subtitle1" sx={{ mt: 2, textAlign: 'center' }}>
+              Add assets and their maintenance schedules to see upcoming tasks.
+            </Typography>
+          )}
+        {!loadingMaintenances && !maintenancePanelError && upcomingMaintenances.length > 0 && (
+          <Grid container spacing={2}>
+            {upcomingMaintenances.map(maint => (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={maint.id}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    borderLeft:
+                      maint.urgencyScore < 0
+                        ? `5px solid ${theme.palette.error.main}`
+                        : maint.urgencyScore <= 7
+                        ? `5px solid ${theme.palette.warning.main}`
+                        : `5px solid ${theme.palette.info.main}`,
+                  }}
+                >
+                  <CardContent>
+                    <Typography variant="caption" color="text.secondary" gutterBottom>
+                      {maint.assetName}
+                    </Typography>
+                    <Typography
+                      variant="h6"
+                      component="div"
+                      noWrap
+                      title={maint.service}
+                      sx={{ mb: 0.5 }}
+                    >
+                      {maint.service}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.875rem', mb: 1.5 }} color="text.secondary">
+                      Status:{' '}
+                      {maint.status
+                        ? maint.status.charAt(0).toUpperCase() + maint.status.slice(1)
+                        : 'N/A'}
+                    </Typography>
+                    <Box mb={1}>
+                      <Typography variant="body2" component="span">
+                        <strong>Due:</strong> {maint.dueDisplay}
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label={maint.urgencyText}
+                      size="small"
+                      color={
+                        maint.urgencyScore < 0
+                          ? 'error'
+                          : maint.urgencyScore <= 7
+                          ? 'warning'
+                          : maint.urgencyScore <= 30
+                          ? 'info'
+                          : 'default'
+                      }
+                      sx={{ fontWeight: 'medium' }}
+                    />
+                  </CardContent>
+                  <CardActions sx={{ mt: 'auto' }}>
+                    <Button
+                      size="small"
+                      component={RouterLink}
+                      to={`/assets/${maint.asset_id}/maintenances/${maint.id}`}
+                    >
+                      View/Edit Maintenance
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
           </Grid>
         )}
       </Box>

@@ -1,11 +1,10 @@
-// frontend/src/components/Login.tsx
 import { useState } from 'react';
-import type { FormEvent } from 'react'; // Mantendo seu import de tipo
-import { useNavigate, Link as RouterLink } from 'react-router'; // Assumindo react-router, se for 'react-router', avise
+import type { FormEvent } from 'react';
+import { useNavigate, Link as RouterLink } from 'react-router';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
-import Link from '@mui/material/Link'; // MUI Link
+import Link from '@mui/material/Link';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
@@ -42,7 +41,7 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
         let errorMessage = 'Login failed. Please check your credentials.';
         try {
           const errorData = await response.json();
-          // Seu backend retorna { error: "mensagem" } ou pode ter { error: { error: "mensagem" } }
+
           if (errorData && errorData.error && typeof errorData.error === 'string') {
             errorMessage = errorData.error;
           } else if (
@@ -51,10 +50,8 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
             errorData.error.error &&
             typeof errorData.error.error === 'string'
           ) {
-            // Caso aninhado
             errorMessage = errorData.error.error;
           } else if (errorData && errorData.message) {
-            // Fallback para .message
             errorMessage = errorData.message;
           }
         } catch (_e) {
@@ -65,10 +62,8 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
         throw new Error(errorMessage);
       }
 
-      // Se chegou aqui, response.ok é true. O backend configurou o cookie httpOnly.
-      // Não precisamos manipular tokens no frontend.
       setIsAuthenticated(true);
-      navigate('/'); // Redireciona para a página principal/dashboard
+      navigate('/');
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);

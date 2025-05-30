@@ -9,7 +9,7 @@ const Footer = () => {
       sx={{
         py: 3,
         px: 2,
-        mt: 'auto', // Pushes footer to the bottom
+        mt: 'auto',
         backgroundColor: theme =>
           theme.palette.mode === 'light' ? theme.palette.grey[200] : theme.palette.grey[800],
       }}

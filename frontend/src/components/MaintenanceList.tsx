@@ -1,5 +1,4 @@
-// frontend/src/components/MaintenanceList.tsx
-import { useEffect, useState, useCallback, useMemo } from 'react'; // Adicionado useMemo
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, Link as RouterLink, useNavigate } from 'react-router';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -19,21 +18,21 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
-import TableSortLabel from '@mui/material/TableSortLabel'; // IMPORTADO PARA ORDENAÇÃO
-import { visuallyHidden } from '@mui/utils'; // IMPORTADO PARA ACESSIBILIDADE DA ORDENAÇÃO
+import TableSortLabel from '@mui/material/TableSortLabel';
+import { visuallyHidden } from '@mui/utils';
 
 interface Maintenance {
   id: string;
   service: string;
   description?: string;
-  performed_at?: string | null; // Permitir null se a API puder retornar
+  performed_at?: string | null;
   status: string;
-  next_due_date?: string | null; // Permitir null
+  next_due_date?: string | null;
   next_due_usage_limit?: number | null;
   next_due_usage_current?: number | null;
   usage_unit?: string | null;
-  // Campos para a coluna "Next Due" combinada
-  _nextDueDisplay?: string; // Campo calculado para exibição e ordenação simples
+
+  _nextDueDisplay?: string;
 }
 
 interface AssetInfo {
@@ -41,10 +40,8 @@ interface AssetInfo {
   name: string;
 }
 
-// Tipos para ordenação
 type SortDirection = 'asc' | 'desc';
-// Chaves de Maintenance que queremos permitir ordenação.
-// _nextDueDisplay é um campo derivado para facilitar a ordenação da coluna "Next Due".
+
 type MaintenanceSortKeys = 'service' | 'performed_at' | 'status' | '_nextDueDisplay';
 
 interface SortConfig {
@@ -52,7 +49,6 @@ interface SortConfig {
   direction: SortDirection;
 }
 
-// Função para formatar a data ou a string de uso para a coluna "Next Due"
 const formatNextDue = (maint: Maintenance): string => {
   if (maint.next_due_date) {
     return new Date(maint.next_due_date).toLocaleDateString();
@@ -77,7 +73,7 @@ const MaintenanceList = () => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: 'performed_at',
     direction: 'desc',
-  }); // Default sort
+  });
 
   const fetchMaintenancesAndAsset = useCallback(async () => {
     if (!assetId) {
@@ -88,7 +84,6 @@ const MaintenanceList = () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch Asset Info (código existente)
       const assetResponse = await fetch(`/api/assets/${assetId}`);
       if (!assetResponse.ok) {
         /* ... tratamento de erro ... */
@@ -125,7 +120,6 @@ const MaintenanceList = () => {
         setError(p => (p ? `${p}\nAsset details not found.` : 'Asset details not found.'));
       }
 
-      // Fetch Maintenances
       const maintResponse = await fetch(`/api/assets/${assetId}/maintenances`);
       if (!maintResponse.ok) {
         /* ... tratamento de erro ... */
@@ -149,7 +143,7 @@ const MaintenanceList = () => {
         fetchedMaint = maintRData.maintenance;
       } else if (Array.isArray(maintRData)) {
         fetchedMaint = maintRData;
-      } // ... outros fallbacks ...
+      }
 
       if (!Array.isArray(fetchedMaint)) {
         setError(p =>
@@ -159,7 +153,7 @@ const MaintenanceList = () => {
         );
         fetchedMaint = [];
       }
-      // Adicionar o campo _nextDueDisplay calculado
+
       const processedMaintenances = fetchedMaint.map(m => ({
         ...m,
         _nextDueDisplay: formatNextDue(m),
@@ -198,16 +192,13 @@ const MaintenanceList = () => {
       if (valB === null || valB === undefined) return -1;
 
       let comparison = 0;
-      // Tratamento especial para datas (performed_at e next_due_date, que é parte de _nextDueDisplay)
+
       if (sortConfig.key === 'performed_at') {
-        // As datas podem ser null, já tratamos acima. Se não forem, são strings ISO.
         comparison = new Date(valA as string).getTime() - new Date(valB as string).getTime();
       } else if (typeof valA === 'number' && typeof valB === 'number') {
         comparison = valA - valB;
       } else if (typeof valA === 'string' && typeof valB === 'string') {
-        // Para _nextDueDisplay, a ordenação alfabética da string formatada pode ser suficiente inicialmente
-        // Ou podemos adicionar lógica mais complexa para diferenciar 'N/A' de datas e strings de uso
-        if (valA === 'N/A') return 1; // Coloca 'N/A' no final
+        if (valA === 'N/A') return 1;
         if (valB === 'N/A') return -1;
         comparison = valA.localeCompare(valB);
       } else {
@@ -267,7 +258,7 @@ const MaintenanceList = () => {
     { id: 'service', numeric: false, label: 'Service' },
     { id: 'performed_at', numeric: false, label: 'Performed At' },
     { id: 'status', numeric: false, label: 'Status' },
-    { id: '_nextDueDisplay', numeric: false, label: 'Next Due' }, // Ordena pela string de display
+    { id: '_nextDueDisplay', numeric: false, label: 'Next Due' },
   ];
 
   return (

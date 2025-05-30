@@ -1,26 +1,22 @@
-// frontend/src/App.tsx
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router'; // Certifique-se que é react-router-dom
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 
-// Layout
 import MainLayout from './components/layout/MainLayout';
 
-// Auth Pages
 import Login from './components/Login';
 import Register from './components/Register';
 import Logout from './components/Logout';
 
-// Content Pages
 import LandingPage from './pages/LandingPage';
 import AssetList from './components/AssetList';
 import AssetForm from './components/AssetForm';
 import MaintenanceList from './components/MaintenanceList';
 import MaintenanceForm from './components/MaintenanceForm';
-import UserProfile from './components/UserProfile'; // <<< ADICIONE O IMPORT
+import UserProfile from './components/UserProfile';
 
 const darkTheme = createTheme({
   palette: {
@@ -78,7 +74,7 @@ function App() {
             element={
               <MainLayout
                 isAuthenticated={isAuthenticated}
-                setIsAuthenticated={setIsAuthenticated} // Passa para MainLayout (que passa para Header)
+                setIsAuthenticated={setIsAuthenticated}
               />
             }
           >
@@ -146,7 +142,7 @@ function App() {
           )}
           {/* Uma forma mais simples para o catch-all de autenticado, se todas as rotas autenticadas estão no MainLayout:
           {isAuthenticated && (
-             <Route path="*" element={<Navigate to="/" replace />} /> // Colocar dentro do bloco isAuthenticated, após todas as rotas específicas
+             <Route path="*" element={<Navigate to="/" replace />} /> 
           )}
           Considerando a estrutura atual, o catch-all para !isAuthenticated está ok.
           Para isAuthenticated, se a rota não for encontrada DENTRO do <Route element={<MainLayout.../>}>,

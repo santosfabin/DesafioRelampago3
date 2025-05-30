@@ -1,4 +1,3 @@
-// frontend/src/components/UserProfile.tsx
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import Container from '@mui/material/Container';
@@ -49,16 +48,14 @@ const UserProfile = ({ setIsAuthenticated }: UserProfileProps) => {
     confirmNewPassword: '',
   });
 
-  // Estados de Loading específicos
-  const [fetchLoading, setFetchLoading] = useState(true); // Para carregar dados iniciais
-  const [submitLoading, setSubmitLoading] = useState(false); // Para o submit do formulário de atualização
-  const [deleteLoading, setDeleteLoading] = useState(false); // Para a exclusão da conta
+  const [fetchLoading, setFetchLoading] = useState(true);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Estado para o modal de confirmação de exclusão
   const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -91,7 +88,7 @@ const UserProfile = ({ setIsAuthenticated }: UserProfileProps) => {
             email: cUserData.email || '',
             newPassword: '',
             confirmNewPassword: '',
-          })); // Limpa campos de senha no load
+          }));
           setInitialUserData({ name: cUserData.name || '', email: cUserData.email || '' });
         } else {
           throw new Error('User data not found in API response.');
@@ -152,7 +149,7 @@ const UserProfile = ({ setIsAuthenticated }: UserProfileProps) => {
       return;
     }
 
-    setSubmitLoading(true); // USA setSubmitLoading
+    setSubmitLoading(true);
     try {
       const response = await fetch('/api/users', {
         method: 'PUT',
@@ -200,7 +197,7 @@ const UserProfile = ({ setIsAuthenticated }: UserProfileProps) => {
       else setError('Failed to update profile.');
     } finally {
       setSubmitLoading(false);
-    } // USA setSubmitLoading
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -209,7 +206,6 @@ const UserProfile = ({ setIsAuthenticated }: UserProfileProps) => {
     try {
       const response = await fetch('/api/users', { method: 'DELETE' });
       if (!response.ok) {
-        // ... (tratamento de erro da API) ...
         let backendErrorMessage = 'Failed to delete account.';
         try {
           const errorData = await response.json();
@@ -230,7 +226,6 @@ const UserProfile = ({ setIsAuthenticated }: UserProfileProps) => {
         throw new Error(backendErrorMessage);
       }
 
-      // AGORA setIsAuthenticated(false) SERÁ CHAMADO, POIS A PROP É OBRIGATÓRIA
       setIsAuthenticated(false);
 
       alert('Your account has been successfully deleted.');

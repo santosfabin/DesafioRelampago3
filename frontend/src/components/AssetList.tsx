@@ -1,5 +1,3 @@
-// frontend/src/components/AssetList.tsx
-
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router';
 import Container from '@mui/material/Container';
@@ -15,15 +13,14 @@ import TableRow from '@mui/material/TableRow';
 import IconButton from '@mui/material/IconButton';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-// import VisibilityIcon from '@mui/icons-material/Visibility'; // Removido
-import BuildIcon from '@mui/icons-material/Build'; // Adicionado
+import BuildIcon from '@mui/icons-material/Build';
 import AddIcon from '@mui/icons-material/Add';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import { visuallyHidden } from '@mui/utils';
-import Tooltip from '@mui/material/Tooltip'; // Adicionado para Tooltips
+import Tooltip from '@mui/material/Tooltip';
 
 interface Asset {
   id: string;

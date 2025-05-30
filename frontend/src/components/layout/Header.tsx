@@ -1,14 +1,13 @@
-// frontend/src/components/layout/Header.tsx
 import type { Dispatch, SetStateAction } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import { Link as RouterLink, useNavigate } from 'react-router'; // USANDO 'react-router'
+import { Link as RouterLink, useNavigate } from 'react-router';
 import Box from '@mui/material/Box';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle'; // Ícone opcional para o perfil
-import IconButton from '@mui/material/IconButton'; // Se quiser usar um ícone como botão
-import Tooltip from '@mui/material/Tooltip'; // Para o tooltip do ícone
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 
 interface HeaderProps {
   isAuthenticated: boolean;
@@ -60,7 +59,7 @@ const Header = ({ isAuthenticated, setIsAuthenticated }: HeaderProps) => {
               <IconButton
                 color="inherit"
                 component={RouterLink}
-                to="/profile" // Navega para a rota do perfil
+                to="/profile"
                 aria-label="account of current user"
               >
                 <AccountCircleIcon />

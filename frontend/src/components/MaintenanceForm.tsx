@@ -1,4 +1,3 @@
-// frontend/src/components/MaintenanceForm.tsx
 import { useState, useEffect, type FormEvent } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import { useParams, useNavigate } from 'react-router';
@@ -17,7 +16,6 @@ import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
-// --- Interfaces ---
 interface MaintenancePayload {
   service: string;
   description?: string | null;
@@ -37,7 +35,7 @@ interface MaintenanceFormData {
   next_due_date: string | null;
   next_due_usage_limit: string | null;
   next_due_usage_current: string | null;
-  usage_unit: string | null; // Definido como string | null
+  usage_unit: string | null;
 }
 
 interface Maintenance {
@@ -49,7 +47,7 @@ interface Maintenance {
   next_due_date?: string | null;
   next_due_usage_limit?: number | null;
   next_due_usage_current?: number | null;
-  usage_unit?: string | null; // API pode retornar string, null ou undefined
+  usage_unit?: string | null;
   asset_id?: string;
   created_at?: string;
 }
@@ -59,7 +57,6 @@ type PredictionType = 'date' | 'usage' | 'none';
 const USAGE_UNITS = ['km', 'horas', 'ciclos'];
 const STATUSES = ['ativa', 'realizada', 'adiada', 'cancelada'];
 
-// --- Componente ---
 const MaintenanceForm = () => {
   const { assetId, maintenanceId } = useParams<{ assetId: string; maintenanceId?: string }>();
   const navigate = useNavigate();
@@ -73,7 +70,7 @@ const MaintenanceForm = () => {
     next_due_date: null,
     next_due_usage_limit: null,
     next_due_usage_current: null,
-    usage_unit: null, // Inicializado como null
+    usage_unit: null,
   };
 
   const [formData, setFormData] = useState<MaintenanceFormData>(initialFormData);
@@ -86,22 +83,11 @@ const MaintenanceForm = () => {
   useEffect(() => {
     if (isEditMode && assetId && maintenanceId) {
       setFetchLoading(true);
-    } else {
-      setFetchLoading(false);
-      setFormData({
-        ...initialFormData,
-        performed_at: new Date().toISOString().split('T')[0],
-      });
-      setPredictionType('none');
-    }
-
-    if (isEditMode && assetId && maintenanceId) {
       setError(null);
       const fetchMaintenance = async () => {
         try {
           const response = await fetch(`/api/assets/${assetId}/maintenances/${maintenanceId}`);
           if (!response.ok) {
-            /* ... (error handling) ... */
             if (response.status === 401 || response.status === 403) navigate('/login');
             let errorMsg = 'Failed to fetch maintenance details';
             try {
@@ -114,13 +100,15 @@ const MaintenanceForm = () => {
             throw new Error(errorMsg);
           }
           const responseData = await response.json();
+
           let maintDetails: Maintenance | undefined;
-          // ... (lógica de extração de maintDetails como antes, ex:)
+
           if (
             responseData &&
             responseData.maintenance &&
             typeof responseData.maintenance === 'object' &&
-            !Array.isArray(responseData.maintenance)
+            !Array.isArray(responseData.maintenance) &&
+            responseData.maintenance.id
           ) {
             maintDetails = responseData.maintenance as Maintenance;
           } else if (
@@ -129,29 +117,64 @@ const MaintenanceForm = () => {
             responseData.maintenance.length > 0
           ) {
             maintDetails = responseData.maintenance[0] as Maintenance;
-          } // ... etc.
+          } else if (
+            responseData &&
+            typeof responseData === 'object' &&
+            !Array.isArray(responseData) &&
+            responseData.id
+          ) {
+            maintDetails = responseData as Maintenance;
+          } else {
+            console.warn(
+              'MaintenanceForm (fetchMaintenance) - Estrutura inesperada da API. MaintDetails não extraído:',
+              responseData
+            );
+            maintDetails = undefined;
+          }
 
           if (maintDetails) {
             let loadedUsageUnit: string | null = null;
             if (maintDetails.usage_unit && USAGE_UNITS.includes(maintDetails.usage_unit)) {
               loadedUsageUnit = maintDetails.usage_unit;
-            } // Se for null, undefined ou inválido, permanece null
+            }
+
+            const formatToInputDate = (dateString: string | null | undefined): string => {
+              if (!dateString) return '';
+              try {
+                if (dateString.includes('T')) {
+                  return dateString.split('T')[0];
+                }
+
+                const d = new Date(dateString);
+                if (!isNaN(d.getTime())) {
+                  const parts = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                  if (parts) return dateString;
+
+                  return d.toISOString().split('T')[0];
+                }
+                return '';
+              } catch (e) {
+                console.error('Erro ao formatar data:', dateString, e);
+                return '';
+              }
+            };
+
+            const formattedPerformedAt = formatToInputDate(maintDetails.performed_at);
+            const formattedNextDueDate = maintDetails.next_due_date
+              ? formatToInputDate(maintDetails.next_due_date)
+              : null;
 
             setFormData({
               service: maintDetails.service || '',
               description: maintDetails.description || '',
-              performed_at: maintDetails.performed_at
-                ? new Date(maintDetails.performed_at).toISOString().split('T')[0]
-                : '',
+              performed_at: formattedPerformedAt,
               status: STATUSES.includes(maintDetails.status) ? maintDetails.status : 'ativa',
-              next_due_date: maintDetails.next_due_date
-                ? new Date(maintDetails.next_due_date).toISOString().split('T')[0]
-                : null,
+              next_due_date: formattedNextDueDate,
               next_due_usage_limit: maintDetails.next_due_usage_limit?.toString() || null,
               next_due_usage_current: maintDetails.next_due_usage_current?.toString() || null,
-              usage_unit: loadedUsageUnit, // <--- CORRIGIDO AQUI
+              usage_unit: loadedUsageUnit,
             });
-            // ... (setPredictionType como antes)
+
             if (maintDetails.next_due_date) {
               setPredictionType('date');
             } else if (
@@ -164,13 +187,11 @@ const MaintenanceForm = () => {
               setPredictionType('none');
             }
           } else {
-            /* ... (error handling) ... */
-            setError('Maintenance details not found or in unexpected format.');
+            setError('Maintenance details not found or could not be processed.');
             setFormData(initialFormData);
             setPredictionType('none');
           }
         } catch (err) {
-          /* ... (error handling) ... */
           if (err instanceof Error) setError(err.message);
           else if (typeof err === 'string') setError(err);
           else setError('An error occurred while fetching maintenance details.');
@@ -185,7 +206,6 @@ const MaintenanceForm = () => {
   }, [assetId, maintenanceId, isEditMode, navigate]);
 
   const handlePredictionTypeChange = (event: SelectChangeEvent<PredictionType>) => {
-    // ... (como antes, já atribui null corretamente)
     const newType = event.target.value as PredictionType;
     setPredictionType(newType);
     setFormData(prev => {
@@ -211,41 +231,34 @@ const MaintenanceForm = () => {
   ) => {
     const { name, value } = e.target;
     let processedValue: string | null = value;
-
     if (name !== 'description' && name !== 'service' && name !== 'status' && value === '') {
       processedValue = null;
     }
-
-    // Tratamento específico para usage_unit para garantir que seja string válida ou null
     if (name === 'usage_unit') {
       if (value && USAGE_UNITS.includes(value)) {
-        processedValue = value; // É uma unidade válida
+        processedValue = value;
       } else {
-        processedValue = null; // Se for "" (do "None") ou inválido, seta para null
+        processedValue = null;
       }
     }
-    // console.log(`handleChange - Name: ${name}, Value: ${value}, ProcessedValue: ${processedValue}`);
+
     setFormData(prev => ({ ...prev, [name]: processedValue }));
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    // ... (como antes, a construção do payload para usage_unit já deve estar ok se formData.usage_unit for string|null)
     event.preventDefault();
     setSubmitLoading(true);
     setError(null);
     setSuccess(null);
 
-    // console.log('handleSubmit - formData ANTES do payload:', JSON.parse(JSON.stringify(formData)));
-    // console.log('handleSubmit - predictionType ANTES do payload:', predictionType);
-
     if (!formData.service.trim()) {
-      setError('Service field is required.');
+      setError('Serviço é obrigatório.');
       setSubmitLoading(false);
       return;
     }
 
     const currentStatus = STATUSES.includes(formData.status) ? formData.status : 'ativa';
-    const currentUsageUnit = formData.usage_unit; // Já é string | null devido ao handleChange
+    const currentUsageUnit = formData.usage_unit;
 
     const payload: MaintenancePayload = {
       service: formData.service,
@@ -269,42 +282,38 @@ const MaintenanceForm = () => {
       if (currentStr && currentStr.trim() !== '' && !isNaN(parseInt(currentStr, 10))) {
         payload.next_due_usage_current = parseInt(currentStr, 10);
       }
-      payload.usage_unit = currentUsageUnit; // Atribui o valor já processado (string válida ou null)
+      payload.usage_unit = currentUsageUnit;
     }
 
-    // console.log('handleSubmit - PAYLOAD construído:', JSON.parse(JSON.stringify(payload)));
-    // ... (validações e try/catch do fetch como antes) ...
     if (payload.status === 'ativa') {
-      const hasValidDatePrediction =
-        predictionType === 'date' && payload.next_due_date !== null && payload.next_due_date !== '';
+      const hasValidDatePrediction = predictionType === 'date' && payload.next_due_date;
       const hasValidUsagePrediction =
         predictionType === 'usage' &&
         typeof payload.next_due_usage_limit === 'number' &&
         typeof payload.next_due_usage_current === 'number' &&
-        payload.usage_unit !== null &&
-        payload.usage_unit !== '';
+        payload.usage_unit;
+
       if (predictionType === 'none') {
-        setError(
-          'Active maintenances require a prediction. Please select "By Date" or "By Usage".'
-        );
+        setError('Manutenções ativas requerem uma previsão. Selecione "Por Data" ou "Por Uso".');
         setSubmitLoading(false);
         return;
       }
       if (predictionType === 'date' && !hasValidDatePrediction) {
         setError(
-          'For "By Date" prediction, "Next Due Date" is required and must be a valid date for active maintenances.'
+          'Para previsão "Por Data", a "Próxima Data Prevista" é obrigatória para manutenções ativas.'
         );
         setSubmitLoading(false);
         return;
       }
       if (predictionType === 'usage' && !hasValidUsagePrediction) {
         setError(
-          'For "By Usage" prediction, all three fields (limit, current, and unit) are required and must be valid for active maintenances.'
+          'Para previsão "Por Uso", todos os três campos (limite, atual, e unidade) são obrigatórios para manutenções ativas.'
         );
         setSubmitLoading(false);
         return;
       }
     }
+
     if (predictionType === 'usage') {
       const filledUsageFieldsCount = [
         payload.next_due_usage_limit,
@@ -318,28 +327,26 @@ const MaintenanceForm = () => {
       ).length;
       if (filledUsageFieldsCount > 0 && filledUsageFieldsCount < 3) {
         setError(
-          'If providing "Next Due Usage", all three fields (limit, current, and unit) are required.'
+          'Se fornecer previsão "Por Uso", todos os três campos (limite, atual, e unidade) são obrigatórios.'
         );
         setSubmitLoading(false);
         return;
       }
     }
-    // console.log('handleSubmit - Passou por todas as validações. Enviando para a API...');
+
     try {
       const url = isEditMode
         ? `/api/assets/${assetId}/maintenances/${maintenanceId}`
         : `/api/assets/${assetId}/maintenances`;
       const method = isEditMode ? 'PUT' : 'POST';
-      console.log(payload);
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
-        /* ... error handling ... */
         const errorData = await response.json();
-        let errorMsg = `Failed to ${isEditMode ? 'update' : 'create'} maintenance`;
+        let errorMsg = `Falha ao ${isEditMode ? 'atualizar' : 'criar'} manutenção`;
         if (errorData && errorData.error && typeof errorData.error === 'string') {
           errorMsg = errorData.error;
         } else if (
@@ -354,25 +361,23 @@ const MaintenanceForm = () => {
         }
         throw new Error(errorMsg);
       }
-      setSuccess(`Maintenance ${isEditMode ? 'updated' : 'created'} successfully!`);
+      setSuccess(`Manutenção ${isEditMode ? 'atualizada' : 'criada'} com sucesso!`);
       setTimeout(() => {
         navigate(`/assets/${assetId}/maintenances`);
       }, 1500);
     } catch (err: unknown) {
-      /* ... error handling ... */
       if (err instanceof Error) {
         setError(err.message);
       } else if (typeof err === 'string') {
         setError(err);
       } else {
-        setError(`An error occurred while ${isEditMode ? 'updating' : 'creating'} maintenance.`);
+        setError(`Ocorreu um erro ao ${isEditMode ? 'atualizar' : 'criar'} a manutenção.`);
       }
     } finally {
       setSubmitLoading(false);
     }
   };
 
-  // --- JSX de Retorno ---
   if (fetchLoading && isEditMode) {
     return (
       <Container sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
@@ -383,17 +388,16 @@ const MaintenanceForm = () => {
 
   return (
     <Container maxWidth="md">
-      {/* ... (Botão Back, Paper, Typography, Alerts) ... */}
       <Button
         startIcon={<ArrowBackIcon />}
         onClick={() => navigate(`/assets/${assetId}/maintenances`)}
         sx={{ my: 2 }}
       >
-        Back to Maintenances
+        Voltar para Manutenções
       </Button>
       <Paper sx={{ p: 3, mt: 1 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          {isEditMode ? 'Edit Maintenance' : 'Add New Maintenance'}
+          {isEditMode ? 'Editar Manutenção' : 'Adicionar Nova Manutenção'}
         </Typography>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -407,14 +411,13 @@ const MaintenanceForm = () => {
         )}
         <Box component="form" onSubmit={handleSubmit} noValidate>
           <Grid container spacing={2}>
-            {/* ... (Campos Service, Description, Performed At, Status) ... */}
             <Grid size={{ xs: 12 }}>
               <TextField
                 margin="normal"
                 required
                 fullWidth
                 id="service"
-                label="Service Performed / To Be Performed"
+                label="Serviço Realizado / A Ser Realizado"
                 name="service"
                 value={formData.service}
                 onChange={handleChange}
@@ -427,7 +430,7 @@ const MaintenanceForm = () => {
                 margin="normal"
                 fullWidth
                 id="description"
-                label="Description (Optional)"
+                label="Descrição (Opcional)"
                 name="description"
                 multiline
                 rows={3}
@@ -441,9 +444,10 @@ const MaintenanceForm = () => {
                 margin="normal"
                 fullWidth
                 id="performed_at"
-                label="Performed At"
+                label="Realizado Em"
                 name="performed_at"
                 type="date"
+                value={formData.performed_at}
                 onChange={handleChange}
                 InputLabelProps={{ shrink: true }}
                 disabled={submitLoading}
@@ -471,19 +475,19 @@ const MaintenanceForm = () => {
             </Grid>
             <Grid size={{ xs: 12 }}>
               <Typography variant="subtitle1" sx={{ mt: 2, mb: 0.5 }}>
-                Next Due Prediction
+                Próxima Previsão
               </Typography>
               <FormControl fullWidth margin="dense" disabled={submitLoading}>
-                <InputLabel id="prediction-type-label">Prediction Type</InputLabel>
+                <InputLabel id="prediction-type-label">Tipo de Previsão</InputLabel>
                 <Select
                   labelId="prediction-type-label"
                   value={predictionType}
-                  label="Prediction Type"
+                  label="Tipo de Previsão"
                   onChange={handlePredictionTypeChange}
                 >
-                  <MenuItem value="none">No Prediction</MenuItem>
-                  <MenuItem value="date">By Date</MenuItem>
-                  <MenuItem value="usage">By Usage</MenuItem>
+                  <MenuItem value="none">Sem Previsão</MenuItem>
+                  <MenuItem value="date">Por Data</MenuItem>
+                  <MenuItem value="usage">Por Uso</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -493,7 +497,7 @@ const MaintenanceForm = () => {
                   margin="dense"
                   fullWidth
                   id="next_due_date"
-                  label="Next Due Date"
+                  label="Próxima Data Prevista"
                   name="next_due_date"
                   type="date"
                   value={formData.next_due_date || ''}
@@ -511,7 +515,7 @@ const MaintenanceForm = () => {
                     margin="dense"
                     fullWidth
                     id="next_due_usage_limit"
-                    label="Next Due Usage Limit"
+                    label="Próximo Limite de Uso"
                     name="next_due_usage_limit"
                     type="number"
                     value={formData.next_due_usage_limit || ''}
@@ -529,7 +533,7 @@ const MaintenanceForm = () => {
                     margin="dense"
                     fullWidth
                     id="next_due_usage_current"
-                    label="Current Usage"
+                    label="Uso Atual"
                     name="next_due_usage_current"
                     type="number"
                     value={formData.next_due_usage_current || ''}
@@ -544,20 +548,17 @@ const MaintenanceForm = () => {
                 </Grid>
                 <Grid size={{ xs: 12, sm: 4 }} sx={{ mt: 1 }}>
                   <FormControl fullWidth margin="dense" disabled={submitLoading} required>
-                    <InputLabel id="usage_unit-label">Usage Unit</InputLabel>
+                    <InputLabel id="usage_unit-label">Unidade de Uso</InputLabel>
                     <Select
                       labelId="usage_unit-label"
                       id="usage_unit"
                       name="usage_unit"
                       value={formData.usage_unit || ''}
-                      label="Usage Unit"
+                      label="Unidade de Uso"
                       onChange={handleChange}
                     >
-                      {' '}
-                      {/* value como '' se for null para o Select */}
-                      {/* Adicionando uma opção "None" explícita se o usuário quiser limpar */}
                       <MenuItem value="">
-                        <em>None</em>
+                        <em>Nenhuma</em>
                       </MenuItem>
                       {USAGE_UNITS.map(u => (
                         <MenuItem key={u} value={u}>
@@ -570,22 +571,21 @@ const MaintenanceForm = () => {
               </>
             )}
           </Grid>
-          {/* ... (Botões Cancel e Submit) ... */}
           <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
             <Button
               variant="outlined"
               onClick={() => navigate(`/assets/${assetId}/maintenances`)}
               disabled={submitLoading}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" variant="contained" color="primary" disabled={submitLoading}>
               {submitLoading ? (
                 <CircularProgress size={24} color="inherit" />
               ) : isEditMode ? (
-                'Save Changes'
+                'Salvar Alterações'
               ) : (
-                'Create Maintenance'
+                'Criar Manutenção'
               )}
             </Button>
           </Box>

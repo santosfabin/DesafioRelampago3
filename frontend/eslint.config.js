@@ -1,4 +1,3 @@
-// frontend/eslint.config.js
 import js from '@eslint/js';
 import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -17,7 +16,7 @@ export default tseslint.config(
       },
       parser: tseslint.parser,
       parserOptions: {
-        project: './tsconfig.app.json', // <--- MUDE AQUI!
+        project: './tsconfig.app.json',
       },
     },
     plugins: {

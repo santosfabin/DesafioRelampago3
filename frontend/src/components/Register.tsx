@@ -1,18 +1,17 @@
-// frontend/src/components/Register.tsx
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router'; // Assumindo react-router-dom
+import { useNavigate, Link as RouterLink } from 'react-router';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
-import MuiLink from '@mui/material/Link'; // MUI Link
-import Grid from '@mui/material/Grid'; // Usando size prop
+import MuiLink from '@mui/material/Link';
+import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import Alert from '@mui/material/Alert';
-// Ícones para o olhinho da senha
+
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Visibility from '@mui/icons-material/Visibility';
@@ -27,7 +26,6 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Estado para controlar a visibilidade da senha
   const [showPassword, setShowPassword] = useState(false);
 
   const handleClickShowPassword = () => {
@@ -35,7 +33,7 @@ const Register = () => {
   };
 
   const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault(); // Evita que o campo perca o foco
+    event.preventDefault();
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -53,7 +51,7 @@ const Register = () => {
         let backendErrorMessage = 'Registration failed. Please check your input or try again.';
         try {
           const errorData = await response.json();
-          // console.log("Error data from backend:", errorData);
+
           if (errorData) {
             if (errorData.error && typeof errorData.error === 'string')
               backendErrorMessage = errorData.error;
@@ -137,14 +135,13 @@ const Register = () => {
                 fullWidth
                 name="password"
                 label="Password"
-                type={showPassword ? 'text' : 'password'} // Alterna o tipo do input
+                type={showPassword ? 'text' : 'password'}
                 id="password"
                 autoComplete="new-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 disabled={loading}
                 InputProps={{
-                  // Adiciona o ícone aqui
                   endAdornment: (
                     <InputAdornment position="end">
                       <IconButton
